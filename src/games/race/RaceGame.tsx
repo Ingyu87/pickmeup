@@ -100,6 +100,8 @@ interface RunnerState {
   finished: boolean;
   finishTime: number;
   swallowed: number;
+  lastY: number;
+  stallMs: number;
 }
 
 interface CourseMap {
@@ -501,6 +503,8 @@ export default function RaceGame() {
           finished: false,
           finishTime: 0,
           swallowed: 0,
+          lastY: 0,
+          stallMs: 0,
         }))
       : runnersRef.current;
 
@@ -567,6 +571,7 @@ export default function RaceGame() {
   const stepRunner = (runner: RunnerState, dt: number, meanY: number) => {
     if (runner.finished) return;
 
+    const beforeY = runner.y;
     const rubber = clamp((meanY - runner.y) / 1600, -0.18, 0.42);
     runner.vy += GRAVITY * (1 + rubber) * dt;
     runner.vx += (Math.random() - 0.5) * 120 * dt;
@@ -623,7 +628,28 @@ export default function RaceGame() {
       }
     });
 
-    if (runner.y >= courseMap.finishY) {
+    const nearFinish = runner.y > courseMap.finishY - 900;
+    const progressed = runner.y - beforeY;
+    if (nearFinish && progressed < 1.2 && Math.abs(runner.vy) < 160) {
+      runner.stallMs += dt * 1000;
+    } else {
+      runner.stallMs = 0;
+    }
+
+    if (nearFinish) {
+      runner.vy += 520 * dt;
+      runner.vx += (WORLD_W / 2 - runner.x) * 0.35 * dt;
+    }
+
+    if (runner.stallMs > 650) {
+      runner.vy = Math.max(runner.vy, 360);
+      runner.vx += (Math.random() - 0.5) * 260;
+      runner.stallMs = 0;
+    }
+
+    runner.lastY = runner.y;
+
+    if (runner.y >= courseMap.finishY - 18) {
       runner.y = courseMap.finishY;
       runner.vx *= 0.2;
       runner.vy = 0;
@@ -656,6 +682,8 @@ export default function RaceGame() {
         finished: false,
         finishTime: 0,
         swallowed: 0,
+        lastY: 230 - row * 44,
+        stallMs: 0,
       };
     });
     finishRef.current = [];
@@ -729,6 +757,8 @@ export default function RaceGame() {
         finished: true,
         finishTime: Date.now() + rank,
         swallowed: 0,
+        lastY: courseMap.finishY,
+        stallMs: 0,
       }));
       finishRef.current = runnersRef.current.map((_, i) => i);
       camYRef.current = courseMap.finishY - 760;
