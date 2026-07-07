@@ -28,29 +28,41 @@ const COURSES = {
   short: {
     label: '클래식 콩콩맵',
     shortLabel: '클래식',
-    height: 2450,
+    height: 4200,
     bgTop: '#9fdcaa',
     bgBottom: '#e8f8d8',
     deco: ['🌲', '🌳', '🍄', '🌼', '📚'],
-    sections: ['pegs', 'bumpers', 'zigzag', 'pegs'],
+    sections: ['pegs', 'bumpers', 'zigzag', 'pegs', 'ramps', 'bumpers'],
   },
   normal: {
     label: '바람개비 지그재그',
     shortLabel: '지그재그',
-    height: 3350,
+    height: 5900,
     bgTop: '#c3b3f2',
     bgBottom: '#f2ebff',
     deco: ['🌀', '🌷', '🦋', '⭐', '✏️'],
-    sections: ['spinners', 'pegs', 'ramps', 'bumpers', 'spinners'],
+    sections: ['spinners', 'pegs', 'ramps', 'bumpers', 'spinners', 'zigzag', 'pegs', 'pads'],
   },
   long: {
     label: '혼돈의 롱코스',
     shortLabel: '롱코스',
-    height: 4300,
+    height: 8200,
     bgTop: '#0d0d33',
     bgBottom: '#31315e',
     deco: ['⭐', '🪐', '🛸', '✨', '🌙'],
-    sections: ['pegs', 'holes', 'spinners', 'pads', 'zigzag', 'bumpers', 'ramps'],
+    sections: [
+      'pegs',
+      'holes',
+      'spinners',
+      'pads',
+      'zigzag',
+      'bumpers',
+      'ramps',
+      'spinners',
+      'holes',
+      'pegs',
+      'pads',
+    ],
   },
 } as const;
 
@@ -113,6 +125,13 @@ interface CourseMap {
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+function obstacleMaxY(o: Obstacle) {
+  if (o.type === 'wall') return Math.max(o.y1, o.y2) + o.t / 2;
+  if (o.type === 'spinner') return o.y + o.len / 2 + o.t / 2;
+  if (o.type === 'pad') return o.y + 70;
+  return o.y + o.r;
 }
 
 function addPegGrid(obstacles: Obstacle[], y: number, rows: number, cols: number) {
@@ -217,7 +236,8 @@ function buildCourse(courseId: CourseId): CourseMap {
     y = addSection(obstacles, key, y);
   });
 
-  const finishBase = Math.max(y + 80, course.height - 620);
+  const lastObstacleY = Math.max(y, ...obstacles.map(obstacleMaxY));
+  const finishBase = Math.max(lastObstacleY + 420, course.height - 620);
   const finishY = finishBase + 520;
   obstacles.unshift(
     { type: 'wall', x1: LEFT_WALL, y1: -120, x2: LEFT_WALL, y2: finishY + 180, t: 18 },
