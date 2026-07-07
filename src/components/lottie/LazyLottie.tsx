@@ -13,6 +13,10 @@ interface LazyLottieProps {
   fallback?: ReactNode;
 }
 
+type LottieModule = {
+  default?: ComponentType<LottieProps> | { default?: ComponentType<LottieProps> };
+};
+
 /**
  * public/lottie/<game>/<scene>/lottie.json을 lazy load해서 재생한다.
  * 에셋이 없거나 reduced-motion이면 fallback을 보여주고,
@@ -37,7 +41,10 @@ export default function LazyLottie({
         if (!alive || !d) return;
         setData(d);
         return import('lottie-react').then((m) => {
-          if (alive) setPlayer(() => m.default as ComponentType<LottieProps>);
+          const mod = m as LottieModule;
+          const component =
+            typeof mod.default === 'function' ? mod.default : mod.default?.default;
+          if (alive && component) setPlayer(() => component);
         });
       })
       .catch(() => {});
