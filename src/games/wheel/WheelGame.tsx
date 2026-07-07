@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ConfettiBurst from '../../components/ConfettiBurst';
+import LazyLottie from '../../components/lottie/LazyLottie';
 import { useAppStore } from '../../stores/session';
 import { activeParticipants, pickWeighted } from '../../lib/draw';
 import { tickSfx, winSfx } from '../../lib/sfx';
@@ -240,6 +241,16 @@ export default function WheelGame() {
               🎯
             </text>
           </svg>
+
+          {phase === 'landed' && (
+            <div className="pointer-events-none absolute inset-0 z-10">
+              <LazyLottie
+                key={winners.length}
+                src="/lottie/wheel/win-burst/lottie.json"
+                className="h-full w-full"
+              />
+            </div>
+          )}
         </div>
 
         {phase === 'landed' && lastWinner && (

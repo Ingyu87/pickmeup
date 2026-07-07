@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ConfettiBurst from '../../components/ConfettiBurst';
+import LazyLottie from '../../components/lottie/LazyLottie';
 import { useAppStore } from '../../stores/session';
 import { activeParticipants, drawOrder, drawWinners } from '../../lib/draw';
 import { winSfx } from '../../lib/sfx';
@@ -88,7 +89,16 @@ export default function LotGame() {
     <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
       {allRevealed && <ConfettiBurst count={40} />}
 
-      <section className="panel flex min-h-[420px] flex-col items-center justify-center gap-6 p-6">
+      <section className="panel relative flex min-h-[420px] flex-col items-center justify-center gap-6 overflow-hidden p-6">
+        {phase === 'reveal' && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <LazyLottie
+              key={revealed}
+              src="/lottie/lot/reveal-paper/lottie.json"
+              className="w-72"
+            />
+          </div>
+        )}
         {phase === 'setup' && (
           <>
             <div className="text-8xl">🎁</div>

@@ -1,6 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import LotGame from '../games/lot/LotGame';
 import WheelGame from '../games/wheel/WheelGame';
+import LadderGame from '../games/ladder/LadderGame';
+import RaceGame from '../games/race/RaceGame';
+import SlotGame from '../games/slot/SlotGame';
 import RobotFigure from '../components/RobotFigure';
 import { useAppStore } from '../stores/session';
 import { activeParticipants } from '../lib/draw';
@@ -55,5 +58,8 @@ export default function GamePage() {
 
   if (gameId === 'lot') return <LotGame />;
   if (gameId === 'wheel') return <WheelGame />;
+  if (gameId === 'ladder') return <LadderGame />;
+  if (gameId === 'race') return <RaceGame />;
+  if (gameId === 'slot') return <SlotGame />;
   return <ComingSoon gameId={gameId} />;
 }

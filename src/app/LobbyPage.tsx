@@ -39,7 +39,7 @@ const GAMES: GameCardDef[] = [
     emoji: '🪜',
     desc: '역할과 모둠을 공정하게 나눠요.',
     tags: ['역할'],
-    ready: false,
+    ready: true,
   },
   {
     id: 'race',
@@ -47,7 +47,7 @@ const GAMES: GameCardDef[] = [
     emoji: '🏁',
     desc: '캐릭터 달리기로 1등과 순위를 정해요.',
     tags: ['순서', '재미'],
-    ready: false,
+    ready: true,
   },
   {
     id: 'slot',
@@ -55,7 +55,7 @@ const GAMES: GameCardDef[] = [
     emoji: '🎁',
     desc: '캡슐이 데구르르! 오늘의 주인공은 누구?',
     tags: ['1명', '재미'],
-    ready: false,
+    ready: true,
   },
 ];
 

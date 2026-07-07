@@ -39,6 +39,9 @@ interface AppStore {
   toggleSound: () => void;
   updateLot: (patch: Partial<GameSettings['lot']>) => void;
   updateWheel: (patch: Partial<GameSettings['wheel']>) => void;
+  updateLadder: (patch: Partial<GameSettings['ladder']>) => void;
+  updateRace: (patch: Partial<GameSettings['race']>) => void;
+  updateSlot: (patch: Partial<GameSettings['slot']>) => void;
   setLastResult: (r: DrawResult | null) => void;
   excludeIds: (ids: string[]) => void;
   resetAll: () => void;
@@ -116,6 +119,30 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       gameSettings: {
         ...get().gameSettings,
         wheel: { ...get().gameSettings.wheel, ...patch },
+      },
+    }),
+
+  updateLadder: (patch) =>
+    set({
+      gameSettings: {
+        ...get().gameSettings,
+        ladder: { ...get().gameSettings.ladder, ...patch },
+      },
+    }),
+
+  updateRace: (patch) =>
+    set({
+      gameSettings: {
+        ...get().gameSettings,
+        race: { ...get().gameSettings.race, ...patch },
+      },
+    }),
+
+  updateSlot: (patch) =>
+    set({
+      gameSettings: {
+        ...get().gameSettings,
+        slot: { ...get().gameSettings.slot, ...patch },
       },
     }),
 
