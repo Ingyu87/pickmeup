@@ -5,6 +5,14 @@ import { activeParticipants, shuffle } from '../../lib/draw';
 import { winSfx } from '../../lib/sfx';
 import { useAppStore } from '../../stores/session';
 
+const WORLD_W = 900;
+const LEFT_WALL = 45;
+const RIGHT_WALL = WORLD_W - 45;
+const RUNNER_R = 17;
+const GRAVITY = 1260;
+const MAX_SPEED = 1850;
+const RESTITUTION = 0.48;
+
 const RUNNERS = [
   '🤖', '📚', '✏️', '💡', '⭐', '🎒', '🧩', '🎯', '📝', '🔔',
   '🚀', '🌈', '🏆', '🎨', '🖍️', '📐', '🧪', '🔎', '🎲', '📌',
@@ -18,48 +26,65 @@ const COLORS = [
 
 const COURSES = {
   short: {
-    label: '기본 핀볼맵',
-    shortLabel: '기본',
-    ms: 7000,
-    rows: 6,
-    gravity: 1320,
-    bounce: 0.72,
-    friction: 0.998,
-    bgTop: '#FFF9EF',
-    bgBottom: '#EFE4FF',
+    label: '클래식 콩콩맵',
+    shortLabel: '클래식',
+    height: 2450,
+    bgTop: '#9fdcaa',
+    bgBottom: '#e8f8d8',
+    deco: ['🌲', '🌳', '🍄', '🌼', '📚'],
+    sections: ['pegs', 'bumpers', 'zigzag', 'pegs'],
   },
   normal: {
-    label: '지그재그 미션맵',
+    label: '바람개비 지그재그',
     shortLabel: '지그재그',
-    ms: 11000,
-    rows: 8,
-    gravity: 1180,
-    bounce: 0.76,
-    friction: 0.996,
-    bgTop: '#F4FFD0',
-    bgBottom: '#E9F9FF',
+    height: 3350,
+    bgTop: '#c3b3f2',
+    bgBottom: '#f2ebff',
+    deco: ['🌀', '🌷', '🦋', '⭐', '✏️'],
+    sections: ['spinners', 'pegs', 'ramps', 'bumpers', 'spinners'],
   },
   long: {
-    label: '혼돈의 롱맵',
-    shortLabel: '롱맵',
-    ms: 15000,
-    rows: 10,
-    gravity: 1080,
-    bounce: 0.8,
-    friction: 0.995,
-    bgTop: '#2B145F',
-    bgBottom: '#120A2B',
+    label: '혼돈의 롱코스',
+    shortLabel: '롱코스',
+    height: 4300,
+    bgTop: '#0d0d33',
+    bgBottom: '#31315e',
+    deco: ['⭐', '🪐', '🛸', '✨', '🌙'],
+    sections: ['pegs', 'holes', 'spinners', 'pads', 'zigzag', 'bumpers', 'ramps'],
   },
 } as const;
 
 type CourseId = keyof typeof COURSES;
 type Phase = 'setup' | 'countdown' | 'racing' | 'done';
 
-interface Pin {
-  nx: number;
-  ny: number;
+interface Wall {
+  type: 'wall';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  t: number;
+}
+
+interface Peg {
+  type: 'peg' | 'bumper' | 'hole' | 'pad';
+  x: number;
+  y: number;
   r: number;
 }
+
+interface Spinner {
+  type: 'spinner';
+  x: number;
+  y: number;
+  len: number;
+  angle: number;
+  omega: number;
+  arms: 2 | 3;
+  t: number;
+}
+
+type Obstacle = Wall | Peg | Spinner;
 
 interface RunnerState {
   id: string;
@@ -74,44 +99,198 @@ interface RunnerState {
   spin: number;
   finished: boolean;
   finishTime: number;
+  swallowed: number;
 }
 
-function buildPins(courseId: CourseId): Pin[] {
-  const course = COURSES[courseId];
-  const pins: Pin[] = [];
-  for (let row = 0; row < course.rows; row++) {
-    const y = 0.19 + row * (0.58 / Math.max(1, course.rows - 1));
-    const count = row % 2 === 0 ? 7 : 6;
-    const offset = row % 2 === 0 ? 0 : 0.06;
-    for (let col = 0; col < count; col++) {
-      const spread = count === 7 ? 0.11 : 0.13;
-      pins.push({
-        nx: 0.15 + offset + col * spread,
-        ny: y,
-        r: courseId === 'long' ? 11 : 12,
-      });
-    }
-  }
-
-  if (courseId !== 'short') {
-    pins.push(
-      { nx: 0.28, ny: 0.36, r: 18 },
-      { nx: 0.72, ny: 0.48, r: 18 },
-    );
-  }
-  if (courseId === 'long') {
-    pins.push(
-      { nx: 0.5, ny: 0.31, r: 20 },
-      { nx: 0.4, ny: 0.67, r: 16 },
-      { nx: 0.6, ny: 0.72, r: 16 },
-    );
-  }
-
-  return pins;
+interface CourseMap {
+  height: number;
+  finishY: number;
+  obstacles: Obstacle[];
+  decorations: { x: number; y: number; emoji: string; size: number }[];
 }
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+function addPegGrid(obstacles: Obstacle[], y: number, rows: number, cols: number) {
+  for (let row = 0; row < rows; row++) {
+    const offset = row % 2 ? 44 : 0;
+    for (let col = 0; col < cols; col++) {
+      obstacles.push({
+        type: 'peg',
+        x: 150 + offset + col * ((WORLD_W - 300) / Math.max(1, cols - 1)),
+        y: y + row * 95,
+        r: 13,
+      });
+    }
+  }
+}
+
+function addRamps(obstacles: Obstacle[], y: number, rows: number) {
+  for (let i = 0; i < rows; i++) {
+    const yy = y + i * 210;
+    if (i % 2 === 0) {
+      obstacles.push({ type: 'wall', x1: LEFT_WALL + 45, y1: yy, x2: RIGHT_WALL - 180, y2: yy + 105, t: 16 });
+    } else {
+      obstacles.push({ type: 'wall', x1: RIGHT_WALL - 45, y1: yy, x2: LEFT_WALL + 180, y2: yy + 105, t: 16 });
+    }
+  }
+}
+
+function addSpinners(obstacles: Obstacle[], y: number, rows: number) {
+  for (let i = 0; i < rows; i++) {
+    obstacles.push({
+      type: 'spinner',
+      x: i % 2 ? 610 : 290,
+      y: y + i * 230,
+      len: i % 2 ? 145 : 125,
+      angle: i * 0.8,
+      omega: (i % 2 ? -1 : 1) * (1.8 + i * 0.1),
+      arms: i % 3 === 0 ? 3 : 2,
+      t: 14,
+    });
+  }
+}
+
+function addSection(obstacles: Obstacle[], key: string, y: number) {
+  if (key === 'pegs') {
+    addPegGrid(obstacles, y, 5, 7);
+    return y + 560;
+  }
+  if (key === 'bumpers') {
+    addPegGrid(obstacles, y, 3, 6);
+    obstacles.push(
+      { type: 'bumper', x: 300, y: y + 210, r: 30 },
+      { type: 'bumper', x: 600, y: y + 340, r: 30 },
+    );
+    return y + 590;
+  }
+  if (key === 'zigzag') {
+    addRamps(obstacles, y + 40, 4);
+    obstacles.push(
+      { type: 'peg', x: 210, y: y + 185, r: 14 },
+      { type: 'peg', x: 690, y: y + 395, r: 14 },
+    );
+    return y + 760;
+  }
+  if (key === 'ramps') {
+    addRamps(obstacles, y, 3);
+    obstacles.push({ type: 'pad', x: 450, y: y + 660, r: 42 });
+    return y + 800;
+  }
+  if (key === 'spinners') {
+    addSpinners(obstacles, y + 80, 3);
+    addPegGrid(obstacles, y + 30, 3, 5);
+    return y + 760;
+  }
+  if (key === 'holes') {
+    obstacles.push(
+      { type: 'hole', x: 280, y: y + 160, r: 54 },
+      { type: 'hole', x: 620, y: y + 330, r: 54 },
+    );
+    addPegGrid(obstacles, y + 80, 3, 6);
+    return y + 620;
+  }
+  if (key === 'pads') {
+    obstacles.push(
+      { type: 'pad', x: 245, y: y + 190, r: 44 },
+      { type: 'pad', x: 655, y: y + 390, r: 44 },
+    );
+    addRamps(obstacles, y + 80, 2);
+    return y + 620;
+  }
+  return y;
+}
+
+function buildCourse(courseId: CourseId): CourseMap {
+  const course = COURSES[courseId];
+  const obstacles: Obstacle[] = [
+    { type: 'wall', x1: LEFT_WALL, y1: -120, x2: LEFT_WALL, y2: course.height + 160, t: 18 },
+    { type: 'wall', x1: RIGHT_WALL, y1: -120, x2: RIGHT_WALL, y2: course.height + 160, t: 18 },
+    { type: 'wall', x1: LEFT_WALL, y1: 120, x2: 330, y2: 330, t: 18 },
+    { type: 'wall', x1: RIGHT_WALL, y1: 120, x2: 570, y2: 330, t: 18 },
+  ];
+
+  let y = 430;
+  course.sections.forEach((key) => {
+    y = addSection(obstacles, key, y);
+  });
+
+  const finishBase = course.height - 620;
+  obstacles.push(
+    { type: 'wall', x1: LEFT_WALL, y1: finishBase, x2: 370, y2: finishBase + 290, t: 18 },
+    { type: 'wall', x1: RIGHT_WALL, y1: finishBase, x2: 530, y2: finishBase + 290, t: 18 },
+    { type: 'spinner', x: 450, y: finishBase + 145, len: 150, angle: 0, omega: 2.2, arms: 2, t: 14 },
+  );
+
+  const decorations = Array.from({ length: 26 }, (_, i) => ({
+    x: i % 2 ? 92 : 808,
+    y: 270 + i * 155,
+    emoji: course.deco[i % course.deco.length],
+    size: 34 + (i % 3) * 8,
+  }));
+
+  return { height: course.height, finishY: course.height - 120, obstacles, decorations };
+}
+
+function collideSegment(r: RunnerState, x1: number, y1: number, x2: number, y2: number, thick: number, bounce = 0) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq ? ((r.x - x1) * dx + (r.y - y1) * dy) / lenSq : 0;
+  t = clamp(t, 0, 1);
+  const px = x1 + dx * t;
+  const py = y1 + dy * t;
+  let nx = r.x - px;
+  let ny = r.y - py;
+  const dist = Math.hypot(nx, ny) || 1;
+  const minDist = r.r + thick / 2;
+  if (dist >= minDist) return false;
+
+  nx /= dist;
+  ny /= dist;
+  r.x += nx * (minDist - dist);
+  r.y += ny * (minDist - dist);
+
+  const vn = r.vx * nx + r.vy * ny;
+  if (vn < 0) {
+    const e = RESTITUTION + bounce;
+    r.vx -= (1 + e) * vn * nx;
+    r.vy -= (1 + e) * vn * ny;
+    const tx = -ny;
+    const ty = nx;
+    const vt = r.vx * tx + r.vy * ty;
+    r.vx -= tx * vt * 0.02;
+    r.vy -= ty * vt * 0.02;
+  }
+  return true;
+}
+
+function collideCircle(r: RunnerState, peg: Peg) {
+  const dx = r.x - peg.x;
+  const dy = r.y - peg.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const minDist = r.r + peg.r;
+  if (dist >= minDist) return false;
+
+  const nx = dx / dist;
+  const ny = dy / dist;
+  r.x += nx * (minDist - dist);
+  r.y += ny * (minDist - dist);
+
+  const vn = r.vx * nx + r.vy * ny;
+  if (vn < 0) {
+    const extra = peg.type === 'bumper' ? 0.55 : peg.type === 'pad' ? 0.95 : 0.1;
+    r.vx -= (1 + RESTITUTION + extra) * vn * nx;
+    r.vy -= (1 + RESTITUTION + extra) * vn * ny;
+    if (peg.type === 'pad') r.vy -= 720;
+    if (peg.type === 'bumper') {
+      r.vx += (Math.random() - 0.5) * 260;
+      r.vy -= 110;
+    }
+  }
+  return true;
 }
 
 export default function RaceGame() {
@@ -131,20 +310,22 @@ export default function RaceGame() {
   const [phase, setPhase] = useState<Phase>('setup');
   const [countdown, setCountdown] = useState('3');
   const [fastForward, setFastForward] = useState(false);
-  const [, setFrame] = useState(0);
+  const [frame, setFrame] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const runnersRef = useRef<RunnerState[]>([]);
   const finishRef = useRef<number[]>([]);
   const rafRef = useRef(0);
   const lastTimeRef = useRef(0);
+  const camYRef = useRef(-260);
+  const gateOpenRef = useRef(false);
   const phaseRef = useRef<Phase>('setup');
   const fastForwardRef = useRef(false);
   fastForwardRef.current = fastForward;
 
   const courseId = (settings.mapId in COURSES ? settings.mapId : 'normal') as CourseId;
   const course = COURSES[courseId];
-  const pins = useMemo(() => buildPins(courseId), [courseId]);
+  const courseMap = useMemo(() => buildCourse(courseId), [courseId]);
   const winnerCount = Math.min(Math.max(1, settings.winnerCount), active.length);
   const hasWeights = active.some((p) => p.weight > 1);
 
@@ -154,13 +335,18 @@ export default function RaceGame() {
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
+  const toScreen = (worldX: number, worldY: number, scale: number, offX: number) => ({
+    x: offX + worldX * scale,
+    y: (worldY - camYRef.current) * scale,
+  });
+
   const drawScene = (preview = false) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(360, rect.width);
-    const height = Math.max(420, rect.height);
+    const height = Math.max(460, rect.height);
     const dpr = window.devicePixelRatio || 1;
     if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
       canvas.width = Math.floor(width * dpr);
@@ -172,6 +358,11 @@ export default function RaceGame() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
+    const scale = Math.min(width / WORLD_W, height / 1040);
+    const offX = (width - WORLD_W * scale) / 2;
+    const viewTop = camYRef.current;
+    const viewBottom = viewTop + height / scale;
+
     const bg = ctx.createLinearGradient(0, 0, 0, height);
     bg.addColorStop(0, course.bgTop);
     bg.addColorStop(1, course.bgBottom);
@@ -179,90 +370,149 @@ export default function RaceGame() {
     ctx.fillRect(0, 0, width, height);
 
     ctx.save();
-    ctx.globalAlpha = courseId === 'long' ? 0.2 : 0.35;
-    ctx.strokeStyle = courseId === 'long' ? '#FFFFFF' : '#7C3AED';
-    ctx.lineWidth = 1;
-    for (let x = 36; x < width; x += 48) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    ctx.restore();
+    ctx.translate(offX, -camYRef.current * scale);
+    ctx.scale(scale, scale);
 
-    const startY = 54;
-    const finishY = height - 72;
-    ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#3B235F';
-    ctx.font = '900 18px Pretendard, sans-serif';
-    ctx.fillText('START', 22, startY - 18);
-    ctx.fillText('FINISH', 22, finishY + 42);
-
-    ctx.strokeStyle = courseId === 'long' ? '#A3E635' : '#7C3AED';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([12, 10]);
-    ctx.beginPath();
-    ctx.moveTo(20, startY);
-    ctx.lineTo(width - 20, startY);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(20, finishY);
-    ctx.lineTo(width - 20, finishY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    pins.forEach((pin) => {
-      const x = pin.nx * width;
-      const y = pin.ny * height;
-      const halo = ctx.createRadialGradient(x, y, 2, x, y, pin.r + 12);
-      halo.addColorStop(0, 'rgba(255,255,255,0.95)');
-      halo.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(x, y, pin.r + 12, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = courseId === 'long' ? '#A3E635' : '#FFFFFF';
-      ctx.strokeStyle = courseId === 'long' ? '#FFFFFF' : '#8B5CF6';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(x, y, pin.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    ctx.fillStyle = courseId === 'long' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.32)';
+    courseMap.decorations.forEach((d) => {
+      if (d.y < viewTop - 100 || d.y > viewBottom + 100) return;
+      ctx.font = `${d.size}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(d.emoji, d.x, d.y);
     });
 
-    const slotCount = Math.min(8, Math.max(3, Math.ceil(active.length / 4)));
-    const slotW = (width - 40) / slotCount;
-    for (let i = 0; i < slotCount; i++) {
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.62)';
-      ctx.fillRect(20 + slotW * i, finishY + 10, slotW - 4, 42);
-    }
+    ctx.strokeStyle = courseId === 'long' ? '#E9D5FF' : '#5B21B6';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([16, 12]);
+    ctx.beginPath();
+    ctx.moveTo(LEFT_WALL, 0);
+    ctx.lineTo(RIGHT_WALL, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#2F1954';
+    ctx.font = '900 32px Pretendard, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('▼ START', WORLD_W / 2, -34);
 
-    const runners = preview
-      ? active.slice(0, 12).map((p, i) => ({
+    courseMap.obstacles.forEach((o) => {
+      if ('y' in o && (o.y < viewTop - 220 || o.y > viewBottom + 220)) return;
+      if (o.type === 'wall') {
+        if (Math.max(o.y1, o.y2) < viewTop - 220 || Math.min(o.y1, o.y2) > viewBottom + 220) return;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = courseId === 'long' ? '#C4B5FD' : '#7C3AED';
+        ctx.lineWidth = o.t + 7;
+        ctx.beginPath();
+        ctx.moveTo(o.x1, o.y1);
+        ctx.lineTo(o.x2, o.y2);
+        ctx.stroke();
+        ctx.strokeStyle = courseId === 'long' ? '#312E81' : '#F4F0FF';
+        ctx.lineWidth = o.t;
+        ctx.beginPath();
+        ctx.moveTo(o.x1, o.y1);
+        ctx.lineTo(o.x2, o.y2);
+        ctx.stroke();
+      } else if (o.type === 'spinner') {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.angle);
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = o.t;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < o.arms; i++) {
+          const a = (Math.PI * 2 * i) / o.arms;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * -o.len / 2, Math.sin(a) * -o.len / 2);
+          ctx.lineTo(Math.cos(a) * o.len / 2, Math.sin(a) * o.len / 2);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (o.type === 'hole') {
+        const g = ctx.createRadialGradient(o.x, o.y, 4, o.x, o.y, o.r + 22);
+        g.addColorStop(0, '#080412');
+        g.addColorStop(0.65, 'rgba(49,18,97,0.75)');
+        g.addColorStop(1, 'rgba(49,18,97,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r + 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#C4B5FD';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([12, 9]);
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (o.type === 'pad') {
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.roundRect(o.x - 70, o.y - 8, 140, 16, 8);
+        ctx.fill();
+        ctx.fillStyle = '#FDE68A';
+        ctx.beginPath();
+        ctx.roundRect(o.x - 58, o.y - 4, 116, 7, 4);
+        ctx.fill();
+        ctx.font = '900 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⇧', o.x, o.y - 28);
+      } else {
+        ctx.fillStyle = o.type === 'bumper' ? '#FACC15' : '#FFFFFF';
+        ctx.strokeStyle = o.type === 'bumper' ? '#F59E0B' : '#8B5CF6';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (o.type === 'bumper') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '900 27px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('★', o.x, o.y + 1);
+        }
+      }
+    });
+
+    const cell = 30;
+    for (let x = LEFT_WALL; x < RIGHT_WALL; x += cell) {
+      ctx.fillStyle = Math.floor((x - LEFT_WALL) / cell) % 2 ? '#2D3748' : '#FFFFFF';
+      ctx.fillRect(x, courseMap.finishY - 14, cell, 28);
+    }
+    ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#B45309';
+    ctx.font = '900 42px Pretendard, sans-serif';
+    ctx.fillText('🏁 결승선 🏁', WORLD_W / 2, courseMap.finishY + 78);
+
+    const visibleRunners = preview
+      ? active.slice(0, 20).map((p, i) => ({
           id: p.id,
           name: p.name,
           icon: RUNNERS[i % RUNNERS.length],
           color: COLORS[i % COLORS.length],
-          x: 60 + (i % 6) * 58,
-          y: startY + 16 + Math.floor(i / 6) * 48,
+          x: WORLD_W / 2 - 240 + (i % 8) * 70,
+          y: 190 - Math.floor(i / 8) * 48,
           vx: 0,
           vy: 0,
-          r: 18,
+          r: RUNNER_R,
           spin: 0,
           finished: false,
           finishTime: 0,
+          swallowed: 0,
         }))
       : runnersRef.current;
 
-    runners.forEach((runner, i) => {
-      const isFinished = runner.finished;
+    visibleRunners.forEach((runner) => {
+      if (runner.y < viewTop - 100 || runner.y > viewBottom + 120) return;
       ctx.save();
       ctx.translate(runner.x, runner.y);
       ctx.rotate(runner.spin);
-      ctx.shadowColor = 'rgba(47, 25, 84, 0.24)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetY = 4;
-      ctx.fillStyle = isFinished ? '#A3E635' : runner.color;
+      ctx.shadowColor = 'rgba(0,0,0,0.24)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 5;
+      ctx.fillStyle = runner.finished ? '#A3E635' : runner.color;
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -276,153 +526,187 @@ export default function RaceGame() {
       ctx.fillText(runner.icon, 0, 1);
       ctx.restore();
 
-      if (phaseRef.current !== 'setup' || i < 8) {
-        ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#2F1954';
-        ctx.font = '800 12px Pretendard, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(runner.name.slice(0, 5), runner.x, runner.y + runner.r + 16);
-      }
+      ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#2F1954';
+      ctx.font = '800 15px Pretendard, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(runner.name.slice(0, 5), runner.x, runner.y + runner.r + 18);
     });
 
     if (phaseRef.current === 'setup') {
       ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#2F1954';
-      ctx.font = '900 30px Pretendard, sans-serif';
+      ctx.font = '900 42px Pretendard, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('핀볼 레이스 준비 완료', width / 2, height / 2 - 8);
-      ctx.font = '800 16px Pretendard, sans-serif';
-      ctx.fillText('출발하면 캐릭터 구슬이 장애물을 통과해 골인합니다', width / 2, height / 2 + 24);
+      ctx.fillText('긴 맵 레이스 준비 완료', WORLD_W / 2, 555);
+      ctx.font = '800 24px Pretendard, sans-serif';
+      ctx.fillText('구슬이 장애물을 통과해 결승선까지 내려갑니다', WORLD_W / 2, 598);
     }
+
+    ctx.restore();
+
+    const progress = clamp((camYRef.current + height / scale) / courseMap.finishY, 0, 1);
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.fillRect(18, height - 20, width - 36, 8);
+    ctx.fillStyle = '#A3E635';
+    ctx.fillRect(18, height - 20, (width - 36) * progress, 8);
   };
 
   const resetPreview = () => {
     finishRef.current = [];
     runnersRef.current = [];
+    camYRef.current = -260;
+    gateOpenRef.current = false;
     drawScene(true);
   };
 
   useEffect(() => {
-    if (phase === 'setup') {
-      resetPreview();
-      return;
-    }
-    drawScene();
+    if (phase === 'setup') resetPreview();
+    else drawScene();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.length, courseId, phase]);
 
-  const beginRace = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const stepRunner = (runner: RunnerState, dt: number, meanY: number) => {
+    if (runner.finished) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const width = Math.max(360, rect.width);
-    const startY = 54;
+    const rubber = clamp((meanY - runner.y) / 1600, -0.18, 0.42);
+    runner.vy += GRAVITY * (1 + rubber) * dt;
+    runner.vx += (Math.random() - 0.5) * 120 * dt;
+    runner.vx *= 0.998;
+    runner.vy = clamp(runner.vy, -MAX_SPEED, MAX_SPEED);
+    runner.x += runner.vx * dt;
+    runner.y += runner.vy * dt;
+    runner.spin += runner.vx * dt * 0.02;
+
+    if (!gateOpenRef.current && runner.y > 315) {
+      runner.y = 315;
+      runner.vy *= -0.25;
+      runner.vx += (Math.random() - 0.5) * 90;
+    }
+
+    if (runner.x < LEFT_WALL + runner.r) {
+      runner.x = LEFT_WALL + runner.r;
+      runner.vx = Math.abs(runner.vx) * 0.72;
+    }
+    if (runner.x > RIGHT_WALL - runner.r) {
+      runner.x = RIGHT_WALL - runner.r;
+      runner.vx = -Math.abs(runner.vx) * 0.72;
+    }
+
+    courseMap.obstacles.forEach((o) => {
+      if (o.type === 'wall') {
+        collideSegment(runner, o.x1, o.y1, o.x2, o.y2, o.t);
+      } else if (o.type === 'spinner') {
+        for (let i = 0; i < o.arms; i++) {
+          const a = o.angle + (Math.PI * 2 * i) / o.arms;
+          const x1 = o.x - Math.cos(a) * o.len / 2;
+          const y1 = o.y - Math.sin(a) * o.len / 2;
+          const x2 = o.x + Math.cos(a) * o.len / 2;
+          const y2 = o.y + Math.sin(a) * o.len / 2;
+          if (collideSegment(runner, x1, y1, x2, y2, o.t, 0.24)) {
+            runner.vx += Math.cos(a + Math.PI / 2) * o.omega * 42;
+            runner.vy += Math.sin(a + Math.PI / 2) * o.omega * 42;
+          }
+        }
+      } else if (o.type === 'hole') {
+        const dx = o.x - runner.x;
+        const dy = o.y - runner.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < o.r + 90) {
+          runner.vx += (dx / d) * 560 * dt;
+          runner.vy += (dy / d) * 560 * dt;
+        }
+        if (d < o.r * 0.5) {
+          runner.vy += 520 * dt;
+          runner.vx += (Math.random() - 0.5) * 180 * dt;
+        }
+      } else {
+        collideCircle(runner, o);
+      }
+    });
+
+    if (runner.y >= courseMap.finishY) {
+      runner.y = courseMap.finishY;
+      runner.vx *= 0.2;
+      runner.vy = 0;
+      runner.finished = true;
+      runner.finishTime = performance.now();
+      finishRef.current.push(runnersRef.current.indexOf(runner));
+      if (finishRef.current.length === 1) winSfx(soundEnabled);
+    }
+  };
+
+  const beginRace = () => {
     const shuffled = shuffle(active.map((p, i) => ({ p, i })));
+    const cols = Math.min(10, Math.max(4, Math.ceil(Math.sqrt(shuffled.length * 1.6))));
+    const spacing = Math.min(62, (WORLD_W - 300) / cols);
 
     runnersRef.current = shuffled.map(({ p, i }, order) => {
-      const gap = width / (shuffled.length + 1);
+      const col = order % cols;
+      const row = Math.floor(order / cols);
       return {
         id: p.id,
         name: p.name,
         icon: RUNNERS[i % RUNNERS.length],
         color: COLORS[i % COLORS.length],
-        x: clamp(gap * (order + 1), 34, width - 34),
-        y: startY - Math.random() * 28,
-        vx: (Math.random() - 0.5) * 90,
-        vy: 80 + Math.random() * 90,
-        r: 18,
+        x: WORLD_W / 2 - ((cols - 1) * spacing) / 2 + col * spacing + (Math.random() - 0.5) * spacing * 0.65,
+        y: 230 - row * 44,
+        vx: (Math.random() - 0.5) * 260,
+        vy: 40 + Math.random() * 80,
+        r: RUNNER_R,
         spin: 0,
         finished: false,
         finishTime: 0,
+        swallowed: 0,
       };
     });
     finishRef.current = [];
+    camYRef.current = -260;
+    gateOpenRef.current = false;
     lastTimeRef.current = 0;
+    setTimeout(() => {
+      gateOpenRef.current = true;
+    }, 900);
 
-    const step = (now: number) => {
-      const canvasNow = canvasRef.current;
-      if (!canvasNow) return;
-      const rectNow = canvasNow.getBoundingClientRect();
-      const widthNow = Math.max(360, rectNow.width);
-      const heightNow = Math.max(420, rectNow.height);
-      const finishY = heightNow - 72;
-
+    const loop = (now: number) => {
       if (lastTimeRef.current === 0) lastTimeRef.current = now;
       const rawDt = Math.min(32, now - lastTimeRef.current) / 1000;
       lastTimeRef.current = now;
 
       const selectedDone =
         settings.winMode === 'first' && finishRef.current.length >= winnerCount;
-      const speedScale = fastForwardRef.current ? 4 : selectedDone ? 2.6 : 1;
+      const speedScale = fastForwardRef.current ? 4 : selectedDone ? 2.8 : settings.speed === 'fast' ? 1.45 : 1;
       const dt = rawDt * speedScale;
 
-      runnersRef.current.forEach((runner, runnerIndex) => {
-        if (runner.finished) return;
-
-        runner.vy += course.gravity * dt;
-        runner.vx += (Math.random() - 0.5) * 220 * dt;
-        runner.vx *= course.friction;
-        runner.vy *= 0.999;
-        runner.x += runner.vx * dt;
-        runner.y += runner.vy * dt;
-        runner.spin += runner.vx * dt * 0.02;
-
-        if (runner.x < runner.r + 10) {
-          runner.x = runner.r + 10;
-          runner.vx = Math.abs(runner.vx) * course.bounce;
-        }
-        if (runner.x > widthNow - runner.r - 10) {
-          runner.x = widthNow - runner.r - 10;
-          runner.vx = -Math.abs(runner.vx) * course.bounce;
-        }
-
-        pins.forEach((pin) => {
-          const px = pin.nx * widthNow;
-          const py = pin.ny * heightNow;
-          const dx = runner.x - px;
-          const dy = runner.y - py;
-          const dist = Math.hypot(dx, dy) || 1;
-          const minDist = runner.r + pin.r;
-          if (dist >= minDist) return;
-
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const overlap = minDist - dist;
-          runner.x += nx * overlap;
-          runner.y += ny * overlap;
-
-          const dot = runner.vx * nx + runner.vy * ny;
-          if (dot < 0) {
-            runner.vx -= (1 + course.bounce) * dot * nx;
-            runner.vy -= (1 + course.bounce) * dot * ny;
-            runner.vx += (Math.random() - 0.5) * 80;
-          }
-        });
-
-        if (runner.y >= finishY) {
-          runner.y = finishY;
-          runner.vx *= 0.2;
-          runner.vy = 0;
-          runner.finished = true;
-          runner.finishTime = now;
-          finishRef.current.push(runnerIndex);
-          if (finishRef.current.length === 1) winSfx(soundEnabled);
-        }
+      courseMap.obstacles.forEach((o) => {
+        if (o.type === 'spinner') o.angle += o.omega * dt;
       });
+
+      const activeRunners = runnersRef.current.filter((r) => !r.finished);
+      const meanY = activeRunners.length
+        ? activeRunners.reduce((sum, r) => sum + r.y, 0) / activeRunners.length
+        : courseMap.finishY;
+      runnersRef.current.forEach((runner) => stepRunner(runner, dt, meanY));
+
+      const leader = runnersRef.current
+        .filter((r) => !r.finished)
+        .sort((a, b) => b.y - a.y)[0];
+      const targetY = leader ? leader.y - 430 : courseMap.finishY - 760;
+      camYRef.current += (clamp(targetY, -360, courseMap.finishY - 520) - camYRef.current) * 0.08;
 
       drawScene();
       setFrame((f) => f + 1);
 
       if (finishRef.current.length < runnersRef.current.length) {
-        rafRef.current = requestAnimationFrame(step);
+        rafRef.current = requestAnimationFrame(loop);
       } else {
         setPhase('done');
         phaseRef.current = 'done';
+        camYRef.current = courseMap.finishY - 760;
         drawScene();
         winSfx(soundEnabled);
       }
     };
 
-    rafRef.current = requestAnimationFrame(step);
+    rafRef.current = requestAnimationFrame(loop);
   };
 
   const start = () => {
@@ -432,20 +716,22 @@ export default function RaceGame() {
     if (reduced) {
       const order = shuffle(active.map((p, i) => ({ p, i })));
       runnersRef.current = order.map(({ p, i }, rank) => ({
-          id: p.id,
-          name: p.name,
-          icon: RUNNERS[i % RUNNERS.length],
-          color: COLORS[i % COLORS.length],
-          x: 70 + rank * 30,
-          y: 360,
-          vx: 0,
-          vy: 0,
-          r: 18,
-          spin: 0,
-          finished: true,
-          finishTime: Date.now() + rank,
-        }));
+        id: p.id,
+        name: p.name,
+        icon: RUNNERS[i % RUNNERS.length],
+        color: COLORS[i % COLORS.length],
+        x: WORLD_W / 2 - 260 + (rank % 8) * 72,
+        y: courseMap.finishY,
+        vx: 0,
+        vy: 0,
+        r: RUNNER_R,
+        spin: 0,
+        finished: true,
+        finishTime: Date.now() + rank,
+        swallowed: 0,
+      }));
       finishRef.current = runnersRef.current.map((_, i) => i);
+      camYRef.current = courseMap.finishY - 760;
       setPhase('done');
       return;
     }
@@ -462,13 +748,11 @@ export default function RaceGame() {
 
   const finishOrder = useMemo(() => {
     if (phase !== 'done') return [];
-    const runners = runnersRef.current;
-    if (runners.length === 0) return finishRef.current;
     return finishRef.current.map((idx) => {
-      const runner = runners[idx];
+      const runner = runnersRef.current[idx];
       return active.findIndex((p) => p.id === runner.id);
     });
-  }, [active, phase]);
+  }, [active, phase, frame]);
 
   const winners = useMemo(() => {
     if (phase !== 'done') return [];
@@ -476,6 +760,15 @@ export default function RaceGame() {
       ? finishOrder.slice(0, winnerCount)
       : [...finishOrder].reverse().slice(0, winnerCount);
   }, [finishOrder, phase, settings.winMode, winnerCount]);
+
+  const liveRanking = useMemo(() => {
+    if (phase !== 'racing' && phase !== 'done') return [];
+    const finished = finishRef.current.map((idx) => runnersRef.current[idx]).filter(Boolean);
+    const running = runnersRef.current
+      .filter((runner) => !runner.finished)
+      .sort((a, b) => b.y - a.y);
+    return [...finished, ...running];
+  }, [phase, frame]);
 
   const finish = () => {
     setLastResult({
@@ -495,19 +788,11 @@ export default function RaceGame() {
     cancelAnimationFrame(rafRef.current);
     finishRef.current = [];
     runnersRef.current = [];
+    camYRef.current = -260;
+    gateOpenRef.current = false;
     setFastForward(false);
     setPhase('setup');
   };
-
-  const liveRanking = useMemo(() => {
-    if (phase !== 'racing' && phase !== 'done') return [];
-    const finished = finishRef.current.map((idx) => runnersRef.current[idx]).filter(Boolean);
-    const running = runnersRef.current
-      .filter((runner) => !runner.finished)
-      .sort((a, b) => b.y - a.y);
-    return [...finished, ...running];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, finishRef.current.length, runnersRef.current.reduce((sum, r) => sum + r.y, 0)]);
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.7fr_minmax(250px,0.7fr)] lg:items-start">
@@ -539,7 +824,7 @@ export default function RaceGame() {
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border-4 border-white bg-white shadow-[0_18px_45px_rgba(47,25,84,0.18)]">
-          <canvas ref={canvasRef} className="block h-[560px] w-full" />
+          <canvas ref={canvasRef} className="block h-[620px] w-full" />
           {phase === 'setup' && (
             <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-3 px-4">
               <button
@@ -567,7 +852,6 @@ export default function RaceGame() {
                       key={id}
                       type="button"
                       className="rounded-2xl border-2 bg-white/90 px-4 py-3 text-sm font-black text-ink-purple shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                      data-selected={courseId === id}
                       disabled={phase !== 'setup'}
                       onClick={() => updateRace({ mapId: id })}
                       style={{
@@ -608,7 +892,7 @@ export default function RaceGame() {
       <section className="flex flex-col gap-4">
         <div className="panel p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-xl font-black text-ink-purple">🏁 핀볼 레이스</h1>
+            <h1 className="text-xl font-black text-ink-purple">🏁 맵 레이스</h1>
             <Link to="/lobby" className="text-sm font-bold text-muted underline">
               ← 로비
             </Link>
@@ -624,7 +908,7 @@ export default function RaceGame() {
                 disabled={phase !== 'setup'}
                 onClick={() => updateRace({ winMode: 'first' })}
               >
-                1등
+                🥇 1등
               </button>
               <button
                 type="button"
@@ -633,7 +917,7 @@ export default function RaceGame() {
                 disabled={phase !== 'setup'}
                 onClick={() => updateRace({ winMode: 'last' })}
               >
-                마지막
+                🎯 마지막
               </button>
             </div>
           </div>
