@@ -1,0 +1,300 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-pick-purple-950: #22005c;
+  --color-pick-purple-800: #4b16b8;
+  --color-pick-purple-600: #7551f2;
+  --color-pick-lime-400: #bfff22;
+  --color-pick-lime-300: #dfff64;
+  --color-pick-pink-400: #ff6fcf;
+  --color-pick-yellow-400: #ffd84a;
+  --color-pick-mint-400: #73f7c5;
+  --color-paper: #fffdf8;
+  --color-surface-lavender: #f3edff;
+  --color-surface-pink: #fff0f8;
+  --color-surface-lime: #f4ffd0;
+  --color-ink: #171320;
+  --color-ink-purple: #32126a;
+  --color-muted: #6f6484;
+  --color-danger: #ff5c7a;
+
+  --font-sans:
+    'Pretendard Variable', Pretendard, 'SUIT', 'Noto Sans KR', system-ui,
+    sans-serif;
+  --font-pixel: Galmuri11, 'Pretendard Variable', Pretendard, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-surface-lavender);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+@layer components {
+  .panel {
+    background: linear-gradient(180deg, #ffffff 0%, #fff9fd 100%);
+    border: 1px solid rgba(75, 22, 184, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 18px 36px rgba(31, 12, 75, 0.14);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 56px;
+    border: 0;
+    border-radius: 16px;
+    padding: 14px 22px;
+    font-size: 20px;
+    font-weight: 900;
+    color: #1b1230;
+    background: linear-gradient(180deg, #e8ff75 0%, #bfff22 100%);
+    box-shadow:
+      0 6px 0 #82b000,
+      0 14px 24px rgba(31, 12, 75, 0.22);
+    cursor: pointer;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      filter 160ms ease;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    filter: brightness(1.04);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow:
+      0 2px 0 #82b000,
+      0 8px 16px rgba(31, 12, 75, 0.18);
+  }
+
+  .btn-primary:disabled {
+    filter: saturate(0.35) brightness(0.96);
+    cursor: not-allowed;
+    box-shadow: 0 4px 0 #b3c78a;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 2px solid rgba(75, 22, 184, 0.16);
+    background: #ffffff;
+    color: var(--color-ink-purple);
+    font-size: 16px;
+    font-weight: 800;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(31, 12, 75, 0.12);
+  }
+
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 92, 122, 0.28);
+    background: #fff0f3;
+    color: #b4233d;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: transform 160ms ease;
+  }
+
+  .btn-danger:hover {
+    transform: translateY(-2px);
+  }
+
+  .input-soft {
+    width: 100%;
+    border: 2px solid rgba(109, 25, 232, 0.18);
+    border-radius: 16px;
+    padding: 13px 16px;
+    background: #ffffff;
+    color: var(--color-ink);
+    font-size: 18px;
+    font-weight: 700;
+    outline: none;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .input-soft:focus {
+    border-color: var(--color-pick-lime-400);
+    box-shadow: 0 0 0 5px rgba(191, 255, 34, 0.24);
+  }
+
+  .option-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 2px solid rgba(109, 25, 232, 0.18);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--color-ink-purple);
+    cursor: pointer;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      background 160ms ease;
+    user-select: none;
+  }
+
+  .option-chip:hover {
+    transform: translateY(-2px);
+  }
+
+  .option-chip[data-selected='true'] {
+    background: linear-gradient(180deg, #f0ffb1 0%, #c8ff2f 100%);
+    border-color: var(--color-pick-lime-400);
+    box-shadow: 0 0 0 4px rgba(191, 255, 34, 0.22);
+  }
+
+  .pixel-title {
+    font-family: var(--font-pixel);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+}
+
+.pop-win {
+  animation: pop-win 450ms cubic-bezier(0.2, 0.75, 0.34, 1.1) both;
+}
+
+@keyframes pop-win {
+  0% {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+  58% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.flip-in {
+  animation: flip-in 500ms cubic-bezier(0.2, 0.75, 0.34, 1) both;
+}
+
+@keyframes flip-in {
+  0% {
+    transform: rotateY(90deg) scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: rotateY(-10deg) scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.fade-up {
+  animation: fade-up 300ms ease-out both;
+}
+
+@keyframes fade-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.bob {
+  animation: bob 3.2s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.confetti-piece {
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  to {
+    transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(720deg);
+    opacity: 0.9;
+  }
+}
+
+.shake {
+  animation: shake 700ms ease-in-out;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-6deg);
+  }
+  40% {
+    transform: rotate(6deg);
+  }
+  60% {
+    transform: rotate(-4deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
