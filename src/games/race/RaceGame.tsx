@@ -6,15 +6,36 @@ import { activeParticipants, shuffle } from '../../lib/draw';
 import { winSfx } from '../../lib/sfx';
 
 const RUNNERS = [
-  '🐰', '🐢', '🦊', '🐼', '🐸', '🐥', '🦄', '🐙', '🐶', '🐱',
-  '🦁', '🐷', '🐨', '🐵', '🐧', '🦖', '🐳', '🦉', '🐹', '🐮',
-  '🦋', '🐞', '🦕', '🐻', '🐭', '🦜', '🐔', '🦩', '🐿️', '🦔',
+  '🤖', '📚', '✏️', '💡', '⭐', '🎒', '🧩', '🎯', '📝', '🔔',
+  '🚀', '🌈', '🏆', '🎨', '🖍️', '📐', '🧪', '🔎', '🎲', '📌',
+  '🟣', '🟢', '🟡', '🩷', '💜', '✅', '✨', '🌟', '📘', '📗',
 ];
 
 const COURSES = {
-  short: { label: '짧게', ms: 7000 },
-  normal: { label: '보통', ms: 11000 },
-  long: { label: '길게', ms: 15000 },
+  short: {
+    label: '교실 스프린트',
+    shortLabel: '짧게',
+    ms: 7000,
+    bg: 'from-[#FFF9EF] via-[#F3EDFF] to-[#E4FBF1]',
+    track: 'bg-white/70',
+    rail: 'border-pick-purple-600/20',
+  },
+  normal: {
+    label: '운동장 한 바퀴',
+    shortLabel: '보통',
+    ms: 11000,
+    bg: 'from-[#E9F9FF] via-[#F4FFD0] to-[#FFF0F8]',
+    track: 'bg-white/75',
+    rail: 'border-pick-lime-400/50',
+  },
+  long: {
+    label: '우주 발표길',
+    shortLabel: '길게',
+    ms: 15000,
+    bg: 'from-pick-purple-950 via-pick-purple-800 to-[#32126A]',
+    track: 'bg-white/15',
+    rail: 'border-white/25',
+  },
 } as const;
 
 type CourseId = keyof typeof COURSES;
@@ -125,6 +146,7 @@ export default function RaceGame() {
   const finish = () => {
     setLastResult({
       gameId: 'race',
+      resultKind: 'order',
       winners: winners.map((i) => active[i].id),
       rankings: finishRef.current.map((idx, rank) => ({
         name: active[idx].name,
@@ -195,12 +217,26 @@ export default function RaceGame() {
                 레이스는 가중치 없이 모두 같은 조건으로 달려요
               </p>
             )}
+            <div className="grid w-full max-w-xl gap-2 sm:grid-cols-3">
+              {(Object.entries(COURSES) as [CourseId, (typeof COURSES)[CourseId]][]).map(
+                ([id, c]) => (
+                  <div
+                    key={id}
+                    className={`rounded-2xl bg-gradient-to-br ${c.bg} border-2 ${
+                      courseId === id ? 'border-pick-lime-400' : 'border-ink-purple/10'
+                    } p-3 text-center shadow-sm`}
+                >
+                    <p className="text-sm font-black text-ink-purple">{c.label}</p>
+                  </div>
+                ),
+              )}
+            </div>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between">
               <p className="text-sm font-extrabold text-ink-purple">
-                {settings.winMode === 'first' ? '🥇 1등' : '🐢 꼴찌'} {winnerCount}명 당첨
+                {settings.winMode === 'first' ? '🥇 1등' : '🎯 마지막'} {winnerCount}명 당첨
               </p>
               {phase === 'racing' && (
                 <button
@@ -214,36 +250,44 @@ export default function RaceGame() {
               )}
             </div>
 
-            <div className="flex max-h-[520px] flex-col gap-1.5 overflow-y-auto pr-1">
+            <div
+              className={`relative flex max-h-[560px] flex-col gap-2 overflow-y-auto rounded-3xl bg-gradient-to-br ${COURSES[courseId].bg} p-3 pr-1`}
+            >
+              <div className="pointer-events-none absolute bottom-4 right-8 top-4 w-2 rounded-full bg-pick-purple-600/30">
+                <div className="h-full w-full bg-[repeating-linear-gradient(to_bottom,#ffffff_0_8px,transparent_8px_16px)]" />
+              </div>
               {active.map((p, i) => {
                 const prog = progressRef.current[i] ?? 0;
                 const finRank = finishRef.current.indexOf(i);
                 const isWinner = phase === 'done' && winners.includes(i);
                 return (
-                  <div key={p.id} className="grid grid-cols-[72px_1fr] items-center gap-2">
+                  <div key={p.id} className="grid grid-cols-[88px_1fr] items-center gap-2">
                     <span
-                      className="truncate text-right text-xs font-extrabold text-ink-purple"
+                      className={`truncate text-right text-xs font-extrabold ${
+                        courseId === 'long' ? 'text-white' : 'text-ink-purple'
+                      }`}
                       title={p.name}
                     >
                       {p.name}
                     </span>
                     <div
-                      className={`relative h-9 overflow-hidden rounded-full border-2 ${
+                      className={`relative h-12 overflow-hidden rounded-2xl border-2 ${COURSES[courseId].rail} ${
                         isWinner
                           ? 'border-pick-lime-400 bg-surface-lime'
-                          : 'border-ink-purple/10 bg-surface-lavender'
+                          : COURSES[courseId].track
                       }`}
                     >
-                      <div className="absolute inset-y-1 right-2 w-0 border-r-4 border-dashed border-pick-purple-600/50" />
+                      <div className="absolute bottom-1 left-3 right-3 h-1 rounded-full bg-pick-purple-600/10" />
+                      <div className="absolute inset-y-1 right-3 w-0 border-r-4 border-dashed border-pick-purple-600/60" />
                       <div
-                        className="absolute top-1/2 flex -translate-y-1/2 items-center"
-                        style={{ left: `calc(${Math.min(prog, 1) * 100}% - ${prog * 40}px)` }}
+                        className="absolute top-1/2 flex -translate-y-1/2 items-center transition-transform duration-75"
+                        style={{ left: `calc(${Math.min(prog, 1) * 100}% - ${prog * 44}px)` }}
                       >
-                        <span className="text-2xl leading-none">
+                        <span className="flex size-10 items-center justify-center rounded-full border-2 border-white bg-white text-2xl leading-none shadow-md">
                           {RUNNERS[i % RUNNERS.length]}
                         </span>
                         {finRank !== -1 && (
-                          <span className="pixel-title ml-1 text-sm text-pick-purple-600">
+                          <span className="pixel-title ml-1 rounded-full bg-pick-lime-400 px-2 py-0.5 text-sm text-pick-purple-600">
                             {finRank + 1}등
                           </span>
                         )}
@@ -302,7 +346,7 @@ export default function RaceGame() {
                 disabled={phase !== 'setup'}
                 onClick={() => updateRace({ winMode: 'last' })}
               >
-                🐢 꼴찌
+                🎯 마지막
               </button>
             </div>
           </div>
@@ -335,7 +379,7 @@ export default function RaceGame() {
                     disabled={phase !== 'setup'}
                     onClick={() => updateRace({ mapId: id })}
                   >
-                    {c.label}
+                    {c.shortLabel}
                   </button>
                 ),
               )}
@@ -379,7 +423,7 @@ export default function RaceGame() {
                       ? 'bg-gradient-to-b from-[#FFF6A8] to-pick-yellow-400 text-ink'
                       : 'bg-surface-lavender text-ink-purple'
                   }`}
-                >
+                  >
                   <span className="pixel-title w-6 text-center">{rank + 1}</span>
                   <span>{RUNNERS[i % RUNNERS.length]}</span>
                   <span className="truncate">{p.name}</span>
