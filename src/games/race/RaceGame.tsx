@@ -32,7 +32,7 @@ const COURSES = {
     bgTop: '#9fdcaa',
     bgBottom: '#e8f8d8',
     deco: ['🌲', '🌳', '🍄', '🌼', '📚'],
-    sections: ['pegs', 'bumpers', 'zigzag', 'pegs', 'ramps', 'bumpers'],
+    sections: ['pegs', 'bumpers', 'movers', 'zigzag', 'bricks', 'pegs', 'ramps', 'bumpers'],
   },
   normal: {
     label: '바람개비 지그재그',
@@ -41,7 +41,7 @@ const COURSES = {
     bgTop: '#c3b3f2',
     bgBottom: '#f2ebff',
     deco: ['🌀', '🌷', '🦋', '⭐', '✏️'],
-    sections: ['spinners', 'pegs', 'ramps', 'bumpers', 'spinners', 'zigzag', 'pegs', 'pads'],
+    sections: ['spinners', 'pegs', 'movers', 'ramps', 'bricks', 'bumpers', 'spinners', 'zigzag', 'pegs', 'pads'],
   },
   long: {
     label: '혼돈의 롱코스',
@@ -57,6 +57,8 @@ const COURSES = {
       'pads',
       'zigzag',
       'bumpers',
+      'movers',
+      'bricks',
       'ramps',
       'spinners',
       'holes',
@@ -85,6 +87,27 @@ interface Peg {
   r: number;
 }
 
+interface Mover {
+  type: 'mover';
+  x: number;
+  y: number;
+  r: number;
+  minX: number;
+  maxX: number;
+  vx: number;
+}
+
+interface Brick {
+  type: 'brick';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  hp: number;
+  dead: boolean;
+  color: string;
+}
+
 interface Spinner {
   type: 'spinner';
   x: number;
@@ -96,7 +119,7 @@ interface Spinner {
   t: number;
 }
 
-type Obstacle = Wall | Peg | Spinner;
+type Obstacle = Wall | Peg | Mover | Brick | Spinner;
 
 interface RunnerState {
   id: string;
@@ -130,6 +153,7 @@ function clamp(n: number, min: number, max: number) {
 function obstacleMaxY(o: Obstacle) {
   if (o.type === 'wall') return Math.max(o.y1, o.y2) + o.t / 2;
   if (o.type === 'spinner') return o.y + o.len / 2 + o.t / 2;
+  if (o.type === 'brick') return o.y + o.h / 2;
   if (o.type === 'pad') return o.y + 70;
   return o.y + o.r;
 }
@@ -174,6 +198,44 @@ function addSpinners(obstacles: Obstacle[], y: number, rows: number) {
   }
 }
 
+function addMovers(obstacles: Obstacle[], y: number, rows: number) {
+  for (let i = 0; i < rows; i++) {
+    const minX = i % 2 ? 220 : 110;
+    const maxX = i % 2 ? 790 : 680;
+    obstacles.push({
+      type: 'mover',
+      x: i % 2 ? maxX : minX,
+      y: y + i * 170,
+      r: 28,
+      minX,
+      maxX,
+      vx: (i % 2 ? -1 : 1) * (130 + i * 22),
+    });
+  }
+}
+
+function addBricks(obstacles: Obstacle[], y: number, rows: number) {
+  const colors = ['#F9A8D4', '#FACC15', '#A3E635', '#93C5FD', '#C4B5FD'];
+  for (let row = 0; row < rows; row++) {
+    const count = row % 2 ? 6 : 7;
+    const w = 82;
+    const gap = 14;
+    const startX = WORLD_W / 2 - (count * w + (count - 1) * gap) / 2 + w / 2;
+    for (let col = 0; col < count; col++) {
+      obstacles.push({
+        type: 'brick',
+        x: startX + col * (w + gap),
+        y: y + row * 64,
+        w,
+        h: 34,
+        hp: row % 3 === 0 ? 2 : 1,
+        dead: false,
+        color: colors[(row + col) % colors.length],
+      });
+    }
+  }
+}
+
 function addSection(obstacles: Obstacle[], key: string, y: number) {
   if (key === 'pegs') {
     addPegGrid(obstacles, y, 5, 7);
@@ -204,6 +266,19 @@ function addSection(obstacles: Obstacle[], key: string, y: number) {
     addSpinners(obstacles, y + 80, 3);
     addPegGrid(obstacles, y + 30, 3, 5);
     return y + 760;
+  }
+  if (key === 'movers') {
+    addMovers(obstacles, y + 80, 4);
+    addPegGrid(obstacles, y + 40, 3, 5);
+    return y + 760;
+  }
+  if (key === 'bricks') {
+    addBricks(obstacles, y + 80, 4);
+    obstacles.push(
+      { type: 'bumper', x: 210, y: y + 370, r: 26 },
+      { type: 'bumper', x: 690, y: y + 370, r: 26 },
+    );
+    return y + 620;
   }
   if (key === 'holes') {
     obstacles.push(
@@ -318,6 +393,59 @@ function collideCircle(r: RunnerState, peg: Peg) {
   return true;
 }
 
+function collideMover(r: RunnerState, mover: Mover) {
+  const dx = r.x - mover.x;
+  const dy = r.y - mover.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const minDist = r.r + mover.r;
+  if (dist >= minDist) return false;
+
+  const nx = dx / dist;
+  const ny = dy / dist;
+  r.x += nx * (minDist - dist);
+  r.y += ny * (minDist - dist);
+  const rvx = r.vx - mover.vx;
+  const vn = rvx * nx + r.vy * ny;
+  if (vn < 0) {
+    r.vx -= (1 + RESTITUTION + 0.45) * vn * nx;
+    r.vy -= (1 + RESTITUTION + 0.45) * vn * ny;
+    r.vx += mover.vx * 0.72;
+    r.vy -= 80;
+  }
+  return true;
+}
+
+function collideBrick(r: RunnerState, brick: Brick) {
+  if (brick.dead) return false;
+  const left = brick.x - brick.w / 2;
+  const right = brick.x + brick.w / 2;
+  const top = brick.y - brick.h / 2;
+  const bottom = brick.y + brick.h / 2;
+  const px = clamp(r.x, left, right);
+  const py = clamp(r.y, top, bottom);
+  let nx = r.x - px;
+  let ny = r.y - py;
+  const dist = Math.hypot(nx, ny) || 1;
+  if (dist >= r.r) return false;
+
+  nx /= dist;
+  ny /= dist;
+  r.x += nx * (r.r - dist);
+  r.y += ny * (r.r - dist);
+  const vn = r.vx * nx + r.vy * ny;
+  if (vn < 0) {
+    r.vx -= (1 + RESTITUTION + 0.18) * vn * nx;
+    r.vy -= (1 + RESTITUTION + 0.18) * vn * ny;
+  }
+  brick.hp -= 1;
+  if (brick.hp <= 0) {
+    brick.dead = true;
+    r.vx += (Math.random() - 0.5) * 180;
+    r.vy -= 90;
+  }
+  return true;
+}
+
 export default function RaceGame() {
   const navigate = useNavigate();
   const participants = useAppStore((s) => s.participants);
@@ -335,6 +463,7 @@ export default function RaceGame() {
   const [phase, setPhase] = useState<Phase>('setup');
   const [countdown, setCountdown] = useState('3');
   const [fastForward, setFastForward] = useState(false);
+  const [courseRunId, setCourseRunId] = useState(0);
   const [frame, setFrame] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -350,7 +479,7 @@ export default function RaceGame() {
 
   const courseId = (settings.mapId in COURSES ? settings.mapId : 'normal') as CourseId;
   const course = COURSES[courseId];
-  const courseMap = useMemo(() => buildCourse(courseId), [courseId]);
+  const courseMap = useMemo(() => buildCourse(courseId), [courseId, courseRunId]);
   const winnerCount = Math.min(Math.max(1, settings.winnerCount), active.length);
   const hasWeights = active.some((p) => p.weight > 1);
 
@@ -484,6 +613,44 @@ export default function RaceGame() {
         ctx.font = '900 28px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('⇧', o.x, o.y - 28);
+      } else if (o.type === 'mover') {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.fillStyle = '#FB7185';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(0, 0, o.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(o.vx > 0 ? '→' : '←', 0, 1);
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(251,113,133,0.32)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(o.minX, o.y);
+        ctx.lineTo(o.maxX, o.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (o.type === 'brick') {
+        if (o.dead) return;
+        ctx.fillStyle = o.color;
+        ctx.strokeStyle = o.hp > 1 ? '#7C3AED' : 'rgba(124,58,237,0.45)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(o.x - o.w / 2, o.y - o.h / 2, o.w, o.h, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#32126A';
+        ctx.font = '900 18px Pretendard, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(o.hp > 1 ? '◆' : '×', o.x, o.y + 1);
       } else {
         ctx.fillStyle = o.type === 'bumper' ? '#FACC15' : '#FFFFFF';
         ctx.strokeStyle = o.type === 'bumper' ? '#F59E0B' : '#8B5CF6';
@@ -646,6 +813,10 @@ export default function RaceGame() {
           runner.vy += 520 * dt;
           runner.vx += (Math.random() - 0.5) * 180 * dt;
         }
+      } else if (o.type === 'mover') {
+        collideMover(runner, o);
+      } else if (o.type === 'brick') {
+        collideBrick(runner, o);
       } else {
         collideCircle(runner, o);
       }
@@ -729,6 +900,17 @@ export default function RaceGame() {
 
       courseMap.obstacles.forEach((o) => {
         if (o.type === 'spinner') o.angle += o.omega * dt;
+        if (o.type === 'mover') {
+          o.x += o.vx * dt;
+          if (o.x < o.minX) {
+            o.x = o.minX;
+            o.vx = Math.abs(o.vx);
+          }
+          if (o.x > o.maxX) {
+            o.x = o.maxX;
+            o.vx = -Math.abs(o.vx);
+          }
+        }
       });
 
       const activeRunners = runnersRef.current.filter((r) => !r.finished);
@@ -844,6 +1026,7 @@ export default function RaceGame() {
     camYRef.current = -260;
     gateOpenRef.current = false;
     setFastForward(false);
+    setCourseRunId((v) => v + 1);
     setPhase('setup');
   };
 
