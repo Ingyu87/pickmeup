@@ -208,8 +208,6 @@ function addSection(obstacles: Obstacle[], key: string, y: number) {
 function buildCourse(courseId: CourseId): CourseMap {
   const course = COURSES[courseId];
   const obstacles: Obstacle[] = [
-    { type: 'wall', x1: LEFT_WALL, y1: -120, x2: LEFT_WALL, y2: course.height + 160, t: 18 },
-    { type: 'wall', x1: RIGHT_WALL, y1: -120, x2: RIGHT_WALL, y2: course.height + 160, t: 18 },
     { type: 'wall', x1: LEFT_WALL, y1: 120, x2: 330, y2: 330, t: 18 },
     { type: 'wall', x1: RIGHT_WALL, y1: 120, x2: 570, y2: 330, t: 18 },
   ];
@@ -219,7 +217,12 @@ function buildCourse(courseId: CourseId): CourseMap {
     y = addSection(obstacles, key, y);
   });
 
-  const finishBase = course.height - 620;
+  const finishBase = Math.max(y + 80, course.height - 620);
+  const finishY = finishBase + 520;
+  obstacles.unshift(
+    { type: 'wall', x1: LEFT_WALL, y1: -120, x2: LEFT_WALL, y2: finishY + 180, t: 18 },
+    { type: 'wall', x1: RIGHT_WALL, y1: -120, x2: RIGHT_WALL, y2: finishY + 180, t: 18 },
+  );
   obstacles.push(
     { type: 'wall', x1: LEFT_WALL, y1: finishBase, x2: 370, y2: finishBase + 290, t: 18 },
     { type: 'wall', x1: RIGHT_WALL, y1: finishBase, x2: 530, y2: finishBase + 290, t: 18 },
@@ -233,7 +236,7 @@ function buildCourse(courseId: CourseId): CourseMap {
     size: 34 + (i % 3) * 8,
   }));
 
-  return { height: course.height, finishY: course.height - 120, obstacles, decorations };
+  return { height: finishY + 160, finishY, obstacles, decorations };
 }
 
 function collideSegment(r: RunnerState, x1: number, y1: number, x2: number, y2: number, thick: number, bounce = 0) {
