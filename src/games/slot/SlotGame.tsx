@@ -267,7 +267,7 @@ export default function SlotGame() {
               disabled={phase !== 'idle'}
               onClick={() => updateSlot({ mode: 'slot' })}
             >
-              🎰 이름 릴
+              🎲 이름 맞추기
             </button>
           </div>
         </div>

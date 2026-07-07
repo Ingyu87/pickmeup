@@ -11,13 +11,21 @@ export interface DrawResult {
   winners: string[];
   rankings?: { name: string; rank: number }[];
   assignments?: { name: string; label: string }[];
+  resultKind?: 'winners' | 'order' | 'assignment' | 'quota';
+  quota?: {
+    capacity: number;
+    total: number;
+    selectedIds: string[];
+    waitlistIds: string[];
+    method: 'uniform-random-order';
+  };
   drawnAt: number;
 }
 
 export interface GameSettings {
   wheel: { winnerCount: number; sequential: boolean };
   lot: {
-    mode: 'one' | 'many' | 'order';
+    mode: 'one' | 'many' | 'order' | 'quota';
     count: number;
     allowDuplicate: boolean;
     revealMode: 'sequential' | 'batch';
@@ -46,7 +54,7 @@ export interface PersistedAppState {
 export function defaultGameSettings(): GameSettings {
   return {
     wheel: { winnerCount: 1, sequential: false },
-    lot: { mode: 'one', count: 2, allowDuplicate: false, revealMode: 'sequential', theme: 'paper' },
+    lot: { mode: 'one', count: 12, allowDuplicate: false, revealMode: 'sequential', theme: 'paper' },
     ladder: { labels: [], revealMode: 'one' },
     race: { winMode: 'first', winnerCount: 1, mapId: 'short', speed: 'normal' },
     slot: { mode: 'gacha', theme: 'basic' },

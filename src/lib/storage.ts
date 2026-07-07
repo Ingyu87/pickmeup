@@ -16,7 +16,27 @@ export function storageAvailable(): boolean {
 function isValidState(data: unknown): data is PersistedAppState {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
-  return d.version === 1 && typeof d.session === 'object' && d.session !== null;
+  if (d.version !== 1) return false;
+  if (!d.session || typeof d.session !== 'object') return false;
+  if (!d.navigation || typeof d.navigation !== 'object') return false;
+  if (!d.preferences || typeof d.preferences !== 'object') return false;
+  if (!d.gameSettings || typeof d.gameSettings !== 'object') return false;
+
+  const session = d.session as Record<string, unknown>;
+  const navigation = d.navigation as Record<string, unknown>;
+  const preferences = d.preferences as Record<string, unknown>;
+
+  return (
+    typeof d.savedAt === 'number' &&
+    typeof session.className === 'string' &&
+    typeof session.rosterText === 'string' &&
+    Array.isArray(session.participants) &&
+    Array.isArray(session.excludedIds) &&
+    typeof navigation.path === 'string' &&
+    typeof preferences.soundEnabled === 'boolean' &&
+    typeof preferences.bgmEnabled === 'boolean' &&
+    (d.lastResult === null || typeof d.lastResult === 'object')
+  );
 }
 
 export function loadState(): PersistedAppState | null {

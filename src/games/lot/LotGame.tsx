@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import ConfettiBurst from '../../components/ConfettiBurst';
 import LazyLottie from '../../components/lottie/LazyLottie';
 import { useAppStore } from '../../stores/session';
-import { activeParticipants, drawOrder, drawWinners } from '../../lib/draw';
+import { activeParticipants, drawOrder, drawUniformOrder, drawWinners } from '../../lib/draw';
 import { winSfx } from '../../lib/sfx';
 import type { Participant } from '../../lib/types';
 
@@ -23,19 +23,25 @@ export default function LotGame() {
   const [revealed, setRevealed] = useState(0);
 
   const active = activeParticipants(participants, excludedIds);
-  const maxCount = settings.allowDuplicate ? 99 : active.length;
+  const quotaCapacity = Math.min(Math.max(1, settings.count), active.length);
+  const maxCount = settings.mode === 'quota' ? active.length : settings.allowDuplicate ? 99 : active.length;
   const count =
     settings.mode === 'one'
       ? 1
       : settings.mode === 'order'
         ? active.length
-        : Math.min(Math.max(1, settings.count), maxCount);
+        : settings.mode === 'quota'
+          ? active.length
+          : Math.min(Math.max(1, settings.count), maxCount);
+  const hasWeights = active.some((p) => p.weight > 1);
 
   const start = () => {
     if (phase !== 'setup' || active.length === 0) return;
     const winners =
       settings.mode === 'order'
         ? drawOrder(participants, excludedIds)
+        : settings.mode === 'quota'
+          ? drawUniformOrder(participants, excludedIds)
         : drawWinners(
             participants,
             excludedIds,
@@ -46,7 +52,7 @@ export default function LotGame() {
     setPhase('drawing');
     setTimeout(() => {
       setPhase('reveal');
-      setRevealed(settings.revealMode === 'batch' ? winners.length : 1);
+      setRevealed(settings.revealMode === 'batch' || settings.mode === 'quota' ? winners.length : 1);
       winSfx(soundEnabled);
     }, 900);
   };
@@ -57,13 +63,31 @@ export default function LotGame() {
   };
 
   const finish = () => {
+    const isQuota = settings.mode === 'quota';
+    const selected = isQuota ? drawn.slice(0, quotaCapacity) : [];
+    const waitlist = isQuota ? drawn.slice(quotaCapacity) : [];
     setLastResult({
       gameId: 'lot',
-      winners: settings.mode === 'order' ? [] : drawn.map((p) => p.id),
-      rankings:
+      winners:
         settings.mode === 'order'
+          ? []
+          : isQuota
+            ? selected.map((p) => p.id)
+            : drawn.map((p) => p.id),
+      rankings:
+        settings.mode === 'order' || isQuota
           ? drawn.map((p, i) => ({ name: p.name, rank: i + 1 }))
           : undefined,
+      resultKind: isQuota ? 'quota' : settings.mode === 'order' ? 'order' : 'winners',
+      quota: isQuota
+        ? {
+            capacity: quotaCapacity,
+            total: drawn.length,
+            selectedIds: selected.map((p) => p.id),
+            waitlistIds: waitlist.map((p) => p.id),
+            method: 'uniform-random-order',
+          }
+        : undefined,
       drawnAt: Date.now(),
     });
     navigate('/result');
@@ -105,6 +129,8 @@ export default function LotGame() {
             <p className="text-xl font-black text-ink-purple">
               {settings.mode === 'order'
                 ? `${active.length}명의 순서를 뽑아요`
+                : settings.mode === 'quota'
+                  ? `${active.length}명 중 ${quotaCapacity}명을 선발해요`
                 : `쪽지 ${count}장을 뽑아요`}
             </p>
             <button type="button" className="btn-primary px-12 text-3xl" onClick={start}>
@@ -138,6 +164,15 @@ export default function LotGame() {
                       {settings.mode === 'order' && (
                         <div className="pixel-title text-lg text-pick-purple-600">
                           {i + 1}번
+                        </div>
+                      )}
+                      {settings.mode === 'quota' && (
+                        <div
+                          className={`pixel-title text-lg ${
+                            i < quotaCapacity ? 'text-pick-purple-600' : 'text-muted'
+                          }`}
+                        >
+                          {i < quotaCapacity ? '선발' : `대기 ${i - quotaCapacity + 1}번`}
                         </div>
                       )}
                       <div className="text-2xl font-black text-ink-purple">
@@ -190,6 +225,7 @@ export default function LotGame() {
                 ['one', '한 명'],
                 ['many', '여러 명'],
                 ['order', '순서 뽑기'],
+                ['quota', '정원 추첨'],
               ] as const
             ).map(([m, label]) => (
               <button
@@ -206,13 +242,15 @@ export default function LotGame() {
           </div>
         </div>
 
-        {settings.mode === 'many' && (
+        {(settings.mode === 'many' || settings.mode === 'quota') && (
           <div className="mb-3">
-            <p className="mb-1 text-sm font-extrabold text-ink-purple">인원</p>
+            <p className="mb-1 text-sm font-extrabold text-ink-purple">
+              {settings.mode === 'quota' ? '모집 정원' : '인원'}
+            </p>
             <input
               type="number"
               min={1}
-              max={maxCount}
+              max={settings.mode === 'quota' ? active.length : maxCount}
               value={settings.count}
               disabled={phase !== 'setup'}
               className="input-soft !w-28"
@@ -220,20 +258,27 @@ export default function LotGame() {
                 updateLot({ count: parseInt(e.target.value, 10) || 1 })
               }
             />
-            <label className="mt-2 flex items-center gap-2 text-sm font-bold text-ink-purple">
-              <input
-                type="checkbox"
-                checked={settings.allowDuplicate}
-                disabled={phase !== 'setup'}
-                className="size-4 accent-pick-purple-600"
-                onChange={(e) => updateLot({ allowDuplicate: e.target.checked })}
-              />
-              같은 친구가 또 뽑혀도 돼요 (중복 허용)
-            </label>
+            {settings.mode === 'quota' ? (
+              <p className="mt-2 rounded-xl bg-surface-lavender px-3 py-2 text-sm font-bold text-ink-purple">
+                전체 신청자 순번을 무작위로 만든 뒤 상위 {quotaCapacity}명을 선발하고,
+                나머지는 대기 순번으로 표시해요.
+              </p>
+            ) : (
+              <label className="mt-2 flex items-center gap-2 text-sm font-bold text-ink-purple">
+                <input
+                  type="checkbox"
+                  checked={settings.allowDuplicate}
+                  disabled={phase !== 'setup'}
+                  className="size-4 accent-pick-purple-600"
+                  onChange={(e) => updateLot({ allowDuplicate: e.target.checked })}
+                />
+                같은 친구가 또 뽑혀도 돼요 (중복 허용)
+              </label>
+            )}
           </div>
         )}
 
-        {count > 1 && (
+        {count > 1 && settings.mode !== 'quota' && (
           <div className="mb-3">
             <p className="mb-1 text-sm font-extrabold text-ink-purple">공개 방법</p>
             <div className="flex gap-2">
@@ -262,6 +307,11 @@ export default function LotGame() {
         <p className="mt-4 border-t border-ink-purple/10 pt-3 text-sm font-bold text-muted">
           참가 {active.length}명
         </p>
+        {settings.mode === 'quota' && hasWeights && (
+          <p className="mt-2 rounded-xl bg-surface-lime px-3 py-2 text-xs font-bold text-ink-purple">
+            ⚖️ 정원 추첨은 공정성을 위해 이름*3 가중치를 적용하지 않아요.
+          </p>
+        )}
 
         {phase !== 'setup' && (
           <button

@@ -189,7 +189,7 @@ export default function HubPage() {
             className="btn-secondary !min-h-10 !text-sm"
             onClick={() => fileRef.current?.click()}
           >
-            📥 가져오기
+            📥 백업 JSON 불러오기
           </button>
           <input
             ref={fileRef}
@@ -209,6 +209,10 @@ export default function HubPage() {
           >
             저장된 데이터 지우기
           </button>
+          <p className="basis-full text-xs font-bold text-muted">
+            JSON 내보내기로 저장한 픽미업 백업 파일만 불러올 수 있어요. 신청자 명단은 위 입력창에
+            붙여넣어 주세요.
+          </p>
         </div>
       </section>
 

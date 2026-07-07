@@ -31,6 +31,16 @@ export default function ResultPage() {
     [lastResult, participants],
   );
 
+  const quotaSelectedNames = useMemo(
+    () => (lastResult?.quota?.selectedIds ?? []).map((id) => displayName(participants, id)),
+    [lastResult, participants],
+  );
+
+  const quotaWaitlistNames = useMemo(
+    () => (lastResult?.quota?.waitlistIds ?? []).map((id) => displayName(participants, id)),
+    [lastResult, participants],
+  );
+
   const layoutSource = useMemo(() => {
     if (!lastResult) return [];
     if (lastResult.rankings?.length) return lastResult.rankings.map((r) => r.name);
@@ -52,15 +62,29 @@ export default function ResultPage() {
 
   const isOrder = !!lastResult.rankings && lastResult.winners.length === 0;
   const isAssign = !!lastResult.assignments?.length;
+  const isQuota = lastResult.resultKind === 'quota' && !!lastResult.quota;
   const gameLabel = GAME_LABELS[lastResult.gameId];
-  const canLayout = layoutSource.length >= 4;
+  const canLayout = !isQuota && layoutSource.length >= 4;
 
   const copyText = () => {
     const lines = [
-      `[픽미업!] ${className ? `${className} · ` : ''}${gameLabel} 결과`,
+      `[픽미업!] ${className ? `${className} · ` : ''}${isQuota ? '정원 추첨' : gameLabel} 결과`,
     ];
-    if (winnerNames.length > 0) lines.push(`🎉 당첨: ${winnerNames.join(', ')}`);
-    if (lastResult.rankings) {
+    if (isQuota && lastResult.quota) {
+      lines.push(
+        `신청 ${lastResult.quota.total}명 · 정원 ${lastResult.quota.capacity}명 · 대기 ${lastResult.quota.waitlistIds.length}명`,
+      );
+      lines.push('선발자');
+      quotaSelectedNames.forEach((name, i) => lines.push(`${i + 1}. ${name}`));
+      if (quotaWaitlistNames.length > 0) {
+        lines.push('대기자');
+        quotaWaitlistNames.forEach((name, i) => lines.push(`대기 ${i + 1}번. ${name}`));
+      }
+      lines.push('전체 신청자 명단을 무작위 순번으로 섞어 상위 정원 수만 선발했습니다.');
+    } else if (winnerNames.length > 0) {
+      lines.push(`🎉 당첨: ${winnerNames.join(', ')}`);
+    }
+    if (!isQuota && lastResult.rankings) {
       lines.push(...lastResult.rankings.map((r) => `${r.rank}. ${r.name}`));
     }
     if (lastResult.assignments) {
@@ -112,13 +136,59 @@ export default function ResultPage() {
         <div className="panel p-6 text-center sm:p-10">
           <p className="text-sm font-extrabold text-muted">
             {className && `${className} · `}
-            {gameLabel}
+            {isQuota ? '정원 추첨' : gameLabel}
           </p>
           <h1 className="pixel-title pop-win my-3 text-6xl text-pick-purple-600 sm:text-7xl">
-            {isOrder ? '순서 결과' : isAssign ? '배정 완료!' : '당첨!'}
+            {isQuota ? '선발 결과' : isOrder ? '순서 결과' : isAssign ? '배정 완료!' : '당첨!'}
           </h1>
 
-          {winnerNames.length > 0 && (
+          {isQuota && lastResult.quota && (
+            <div className="mx-auto mb-6 max-w-2xl rounded-2xl bg-surface-lavender px-4 py-3 text-center">
+              <p className="text-lg font-black text-ink-purple">
+                신청 {lastResult.quota.total}명 · 정원 {lastResult.quota.capacity}명 · 대기{' '}
+                {lastResult.quota.waitlistIds.length}명
+              </p>
+              <p className="mt-1 text-sm font-bold text-muted">
+                전체 신청자 순번을 무작위로 섞어 상위 정원 수만 선발했습니다.
+              </p>
+            </div>
+          )}
+
+          {isQuota ? (
+            <div className="mx-auto mb-6 grid max-w-3xl gap-4 text-left lg:grid-cols-[1.1fr_0.9fr]">
+              <section className="rounded-3xl border-4 border-pick-lime-400 bg-surface-lime p-4">
+                <p className="mb-3 text-xl font-black text-pick-purple-600">선발자</p>
+                <ol className="grid gap-2 sm:grid-cols-2">
+                  {quotaSelectedNames.map((name, i) => (
+                    <li
+                      key={`${name}-${i}`}
+                      className="rounded-xl bg-white/75 px-3 py-2 text-lg font-black text-ink-purple"
+                    >
+                      {i + 1}. {name}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
+              <section className="rounded-3xl border-2 border-pick-purple-600/20 bg-surface-lavender p-4">
+                <p className="mb-3 text-xl font-black text-pick-purple-600">대기 순번</p>
+                {quotaWaitlistNames.length > 0 ? (
+                  <ol className="grid max-h-80 gap-2 overflow-y-auto pr-1">
+                    {quotaWaitlistNames.map((name, i) => (
+                      <li
+                        key={`${name}-${i}`}
+                        className="rounded-xl bg-white px-3 py-2 text-base font-extrabold text-ink-purple"
+                      >
+                        대기 {i + 1}번. {name}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm font-bold text-muted">대기자가 없어요.</p>
+                )}
+              </section>
+            </div>
+          ) : winnerNames.length > 0 && (
             <div
               className={`mx-auto mb-6 grid max-w-2xl gap-3 ${
                 winnerNames.length === 1
@@ -146,7 +216,7 @@ export default function ResultPage() {
             </div>
           )}
 
-          {lastResult.rankings && (
+          {!isQuota && lastResult.rankings && (
             <ol className="mx-auto mb-6 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3">
               {lastResult.rankings.map((r) => (
                 <li

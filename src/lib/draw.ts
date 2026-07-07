@@ -69,3 +69,11 @@ export function drawOrder(
 ): Participant[] {
   return drawWinners(participants, excludedIds, Number.MAX_SAFE_INTEGER, false);
 }
+
+/** 공식 정원 추첨용: 가중치를 무시하고 활성 참가자 전체를 동일 확률로 섞는다. */
+export function drawUniformOrder(
+  participants: Participant[],
+  excludedIds: string[],
+): Participant[] {
+  return shuffle(activeParticipants(participants, excludedIds));
+}

@@ -195,8 +195,13 @@ export default function LadderGame() {
   const allDone = cols > 0 && Object.keys(assigned).length === cols;
 
   const finish = () => {
+    if (!allDone) {
+      showToast('전원 공개 후 결과를 볼 수 있어요');
+      return;
+    }
     setLastResult({
       gameId: 'ladder',
+      resultKind: 'assignment',
       winners: [],
       assignments: active.map((p, c) => ({
         name: p.name,
