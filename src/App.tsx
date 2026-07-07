@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
+import Footer from './components/Footer';
 import ToastHost from './components/ToastHost';
 import HubPage from './app/HubPage';
 import LobbyPage from './app/LobbyPage';
 import GamePage from './app/GamePage';
 import ResultPage from './app/ResultPage';
+import TermsPage from './app/TermsPage';
+import PrivacyPage from './app/PrivacyPage';
 import { useAppStore } from './stores/session';
 import { showToast } from './lib/toast';
 
@@ -53,9 +56,12 @@ export default function App() {
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/game/:id" element={<GamePage />} />
           <Route path="/result" element={<ResultPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <Footer />
       <ToastHost />
     </div>
   );
