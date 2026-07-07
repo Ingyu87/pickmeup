@@ -228,8 +228,8 @@ export default function LadderGame() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.6fr_minmax(260px,0.8fr)] lg:items-start">
-      <section className="panel overflow-x-auto p-4">
+    <div className="game-shell lg:grid-cols-[1.6fr_minmax(260px,0.8fr)] lg:items-start">
+      <section className="panel overflow-x-auto p-3 sm:p-4">
         <svg width={width} height={height} className="mx-auto block">
           {active.map((p, c) => {
             const done = assigned[c] !== undefined;

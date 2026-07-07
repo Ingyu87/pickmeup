@@ -27,9 +27,17 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--color-surface-lavender);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 @layer components {
@@ -38,6 +46,7 @@ body {
     border: 1px solid rgba(75, 22, 184, 0.12);
     border-radius: 18px;
     box-shadow: 0 18px 36px rgba(31, 12, 75, 0.14);
+    min-width: 0;
   }
 
   .btn-primary {
@@ -180,6 +189,24 @@ body {
     box-shadow: 0 0 0 4px rgba(191, 255, 34, 0.22);
   }
 
+  .game-shell {
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .game-stage {
+    min-height: min(62vh, 520px);
+  }
+
+  .game-canvas {
+    height: min(62vh, 620px);
+    min-height: 420px;
+  }
+
   .pixel-title {
     font-family: var(--font-pixel);
     letter-spacing: -0.02em;
@@ -222,6 +249,71 @@ body {
     line-height: 1.65;
     font-size: 16px;
     font-weight: 600;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    border-radius: 14px;
+    box-shadow: 0 10px 22px rgba(31, 12, 75, 0.1);
+  }
+
+  .btn-primary {
+    min-height: 48px;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-size: 17px;
+    box-shadow:
+      0 4px 0 #82b000,
+      0 10px 18px rgba(31, 12, 75, 0.18);
+  }
+
+  .btn-secondary,
+  .btn-danger {
+    min-height: 44px;
+    border-radius: 12px;
+    padding: 9px 13px;
+    font-size: 14px;
+  }
+
+  .input-soft {
+    border-radius: 14px;
+    padding: 11px 13px;
+    font-size: 16px;
+  }
+
+  .option-chip {
+    min-height: 42px;
+    padding: 8px 13px;
+    font-size: 14px;
+  }
+
+  .game-shell {
+    gap: 0.875rem;
+    padding: 0.75rem;
+  }
+
+  .game-stage {
+    min-height: 360px;
+  }
+
+  .game-canvas {
+    height: 62vh;
+    min-height: 380px;
+    max-height: 560px;
+  }
+
+  .legal-page h1 {
+    font-size: 26px;
+  }
+
+  .legal-page h2 {
+    font-size: 18px;
+  }
+
+  .legal-page p,
+  .legal-page li {
+    font-size: 14px;
   }
 }
 

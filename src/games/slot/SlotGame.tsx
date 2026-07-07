@@ -132,10 +132,10 @@ export default function SlotGame() {
   const capsuleColor = CAPSULE_COLORS[winners.length % CAPSULE_COLORS.length];
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
+    <div className="game-shell max-w-6xl lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
       {phase === 'open' && <ConfettiBurst count={35} />}
 
-      <section className="panel flex min-h-[440px] flex-col items-center justify-center gap-6 p-6">
+      <section className="panel game-stage flex flex-col items-center justify-center gap-5 p-4 sm:gap-6 sm:p-6">
         {settings.mode === 'gacha' ? (
           <>
             <div
@@ -207,7 +207,7 @@ export default function SlotGame() {
           {phase === 'idle' && (
             <button
               type="button"
-              className="btn-primary px-12 text-3xl"
+              className="btn-primary px-8 text-2xl sm:px-12 sm:text-3xl"
               onClick={pull}
               disabled={remaining.length === 0}
             >

@@ -173,11 +173,11 @@ export default function WheelGame() {
   const done = winners.length >= winnerCount && phase === 'landed';
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
+    <div className="game-shell max-w-6xl lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
       {done && <ConfettiBurst count={50} />}
 
-      <section className="panel relative flex flex-col items-center gap-4 p-6">
-        <div className="relative w-full max-w-lg">
+      <section className="panel relative flex flex-col items-center gap-4 p-4 sm:p-6">
+        <div className="relative w-full max-w-[min(32rem,78vh)]">
           <div
             className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1"
             aria-hidden
@@ -264,7 +264,7 @@ export default function WheelGame() {
           {phase === 'idle' && winners.length === 0 && (
             <button
               type="button"
-              className="btn-primary px-12 text-3xl"
+              className="btn-primary px-8 text-2xl sm:px-12 sm:text-3xl"
               onClick={spin}
               disabled={wheelPs.length < 2}
             >
@@ -277,7 +277,7 @@ export default function WheelGame() {
             </button>
           )}
           {done && (
-            <button type="button" className="btn-primary px-10 text-2xl" onClick={finish}>
+            <button type="button" className="btn-primary px-8 text-xl sm:px-10 sm:text-2xl" onClick={finish}>
               결과 보기 →
             </button>
           )}

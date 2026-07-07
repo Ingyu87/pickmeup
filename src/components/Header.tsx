@@ -13,9 +13,9 @@ export default function Header() {
   };
 
   return (
-    <header className="flex items-center gap-3 bg-pick-purple-950 px-4 py-3 text-white sm:px-6">
-      <Link to="/" className="flex items-baseline gap-2 no-underline">
-        <span className="pixel-title text-2xl text-pick-lime-400 sm:text-3xl">
+    <header className="flex flex-wrap items-center gap-2 bg-pick-purple-950 px-3 py-3 text-white sm:gap-3 sm:px-6">
+      <Link to="/" className="flex min-w-0 items-baseline gap-2 no-underline">
+        <span className="pixel-title text-xl text-pick-lime-400 sm:text-3xl">
           픽미업!
         </span>
         <span className="hidden text-xs font-bold text-white/60 sm:inline">
@@ -24,16 +24,16 @@ export default function Header() {
       </Link>
 
       {className && (
-        <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-bold">
+        <span className="max-w-[9rem] truncate rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold sm:max-w-none sm:px-3 sm:text-sm">
           {className}
         </span>
       )}
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
         {location.pathname !== '/' && (
           <Link
             to="/"
-            className="rounded-xl border-2 border-white/30 bg-white/10 px-3 py-2 text-sm font-extrabold text-white no-underline hover:bg-white/20"
+            className="rounded-xl border-2 border-white/30 bg-white/10 px-2.5 py-2 text-xs font-extrabold text-white no-underline hover:bg-white/20 sm:px-3 sm:text-sm"
           >
             처음으로
           </Link>
@@ -41,10 +41,10 @@ export default function Header() {
         <button
           type="button"
           onClick={toggleSound}
-          className="rounded-xl border-2 border-white/30 bg-white/10 px-3 py-2 text-sm font-extrabold hover:bg-white/20"
+          className="rounded-xl border-2 border-white/30 bg-white/10 px-2.5 py-2 text-xs font-extrabold hover:bg-white/20 sm:px-3 sm:text-sm"
           aria-pressed={soundEnabled}
         >
-          {soundEnabled ? '🔊 소리 켬' : '🔇 소리 끔'}
+          {soundEnabled ? '🔊 켬' : '🔇 끔'}
         </button>
         <button
           type="button"

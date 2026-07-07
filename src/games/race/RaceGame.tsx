@@ -825,13 +825,13 @@ export default function RaceGame() {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.7fr_minmax(250px,0.7fr)] lg:items-start">
+    <div className="game-shell lg:grid-cols-[1.7fr_minmax(250px,0.7fr)] lg:items-start">
       {phase === 'done' && <ConfettiBurst count={50} />}
 
-      <section className="panel relative flex flex-col gap-3 p-4 sm:p-6">
+      <section className="panel relative flex min-w-0 flex-col gap-3 p-3 sm:p-6">
         {phase === 'countdown' && (
           <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-pick-purple-950/80">
-            <span className="pixel-title pop-win text-8xl text-pick-lime-400" key={countdown}>
+            <span className="pixel-title pop-win text-6xl text-pick-lime-400 sm:text-8xl" key={countdown}>
               {countdown}
             </span>
           </div>
@@ -853,13 +853,13 @@ export default function RaceGame() {
           )}
         </div>
 
-        <div className="relative overflow-hidden rounded-3xl border-4 border-white bg-white shadow-[0_18px_45px_rgba(47,25,84,0.18)]">
-          <canvas ref={canvasRef} className="block h-[620px] w-full" />
+        <div className="relative overflow-hidden rounded-2xl border-4 border-white bg-white shadow-[0_18px_45px_rgba(47,25,84,0.18)] sm:rounded-3xl">
+          <canvas ref={canvasRef} className="game-canvas block w-full" />
           {phase === 'setup' && (
             <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-3 px-4">
               <button
                 type="button"
-                className="btn-primary px-12 text-3xl"
+                className="btn-primary px-8 text-2xl sm:px-12 sm:text-3xl"
                 onClick={start}
                 disabled={active.length < 2}
               >

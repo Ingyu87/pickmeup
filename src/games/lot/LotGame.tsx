@@ -110,10 +110,10 @@ export default function LotGame() {
   const allRevealed = phase === 'reveal' && revealed >= drawn.length;
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
+    <div className="game-shell max-w-6xl lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
       {allRevealed && <ConfettiBurst count={40} />}
 
-      <section className="panel relative flex min-h-[420px] flex-col items-center justify-center gap-6 overflow-hidden p-6">
+      <section className="panel game-stage relative flex flex-col items-center justify-center gap-4 overflow-hidden p-4 sm:gap-6 sm:p-6">
         {phase === 'reveal' && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <LazyLottie
@@ -125,7 +125,7 @@ export default function LotGame() {
         )}
         {phase === 'setup' && (
           <>
-            <div className="text-8xl">🎁</div>
+            <div className="text-6xl sm:text-8xl">🎁</div>
             <p className="text-xl font-black text-ink-purple">
               {settings.mode === 'order'
                 ? `${active.length}명의 순서를 뽑아요`
@@ -133,7 +133,7 @@ export default function LotGame() {
                   ? `${active.length}명 중 ${quotaCapacity}명을 선발해요`
                 : `쪽지 ${count}장을 뽑아요`}
             </p>
-            <button type="button" className="btn-primary px-12 text-3xl" onClick={start}>
+            <button type="button" className="btn-primary px-8 text-2xl sm:px-12 sm:text-3xl" onClick={start}>
               뽑기!
             </button>
             <p className="text-sm text-muted">Space 키로도 시작할 수 있어요</p>
@@ -142,7 +142,7 @@ export default function LotGame() {
 
         {phase === 'drawing' && (
           <>
-            <div className="shake text-8xl">🎁</div>
+            <div className="shake text-6xl sm:text-8xl">🎁</div>
             <p className="text-2xl font-black text-ink-purple">두구두구...</p>
           </>
         )}
@@ -197,7 +197,7 @@ export default function LotGame() {
               </div>
             )}
             {allRevealed && (
-              <button type="button" className="btn-primary px-10 text-2xl" onClick={finish}>
+              <button type="button" className="btn-primary px-8 text-xl sm:px-10 sm:text-2xl" onClick={finish}>
                 결과 보기 →
               </button>
             )}

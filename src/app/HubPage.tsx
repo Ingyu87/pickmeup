@@ -59,9 +59,9 @@ export default function HubPage() {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(300px,0.9fr)_minmax(380px,1.1fr)] lg:items-start">
-      <section className="panel flex flex-col items-center gap-4 p-6 text-center lg:sticky lg:top-6">
-        <RobotFigure scene="guide" className="w-full max-w-sm" />
+    <div className="mx-auto grid w-full max-w-6xl gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(300px,0.9fr)_minmax(380px,1.1fr)] lg:items-start">
+      <section className="panel flex flex-col items-center gap-4 p-4 text-center sm:p-6 lg:sticky lg:top-6">
+        <RobotFigure scene="guide" className="w-full max-w-[16rem] sm:max-w-sm" />
         <div className="rounded-2xl bg-surface-lavender px-5 py-3">
           <p className="text-lg font-extrabold text-ink-purple">
             명단을 붙여넣으면 바로 뽑을 수 있어요!
@@ -88,7 +88,7 @@ export default function HubPage() {
         </p>
       </section>
 
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <h1 className="mb-4 text-2xl font-black text-ink-purple">반 설정</h1>
 
         <label className="mb-1 block text-base font-extrabold text-ink-purple">
@@ -166,7 +166,7 @@ export default function HubPage() {
 
         <button
           type="button"
-          className="btn-primary w-full text-2xl"
+          className="btn-primary w-full text-xl sm:text-2xl"
           disabled={active.length === 0}
           onClick={() => navigate('/lobby')}
         >
@@ -204,7 +204,7 @@ export default function HubPage() {
           />
           <button
             type="button"
-            className="btn-danger !min-h-10 ml-auto !text-sm"
+            className="btn-danger !min-h-10 sm:ml-auto !text-sm"
             onClick={() => setConfirm('all')}
           >
             저장된 데이터 지우기

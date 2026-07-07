@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
-    <footer className="mt-auto bg-[#303c3c] px-4 py-7 text-center text-sm font-bold text-white/75">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-4">
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+    <footer className="mt-auto bg-[#303c3c] px-4 py-6 text-center text-xs font-bold leading-relaxed text-white/75 sm:py-7 sm:text-sm">
+      <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 sm:gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:gap-x-6">
           <span>© 2026 ingyu's AI world. All rights reserved.</span>
           <Link to="/terms" className="text-white no-underline hover:underline">
             이용약관

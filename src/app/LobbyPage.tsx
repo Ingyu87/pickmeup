@@ -70,10 +70,10 @@ export default function LobbyPage() {
     filter === '전체' ? GAMES : GAMES.filter((g) => g.tags.includes(filter));
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-pick-purple-800 to-pick-purple-950 px-4 py-8 sm:px-6">
+    <div className="min-h-full bg-gradient-to-b from-pick-purple-800 to-pick-purple-950 px-3 py-5 sm:px-6 sm:py-8">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="pixel-title text-3xl text-pick-lime-400 sm:text-4xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+          <h1 className="pixel-title text-2xl text-pick-lime-400 sm:text-4xl">
             오늘은 어떤 뽑기를 할까요?
           </h1>
           <Link
@@ -98,11 +98,11 @@ export default function LobbyPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {visible.map((g) => (
             <div
               key={g.id}
-              className={`panel flex flex-col gap-2 p-5 ${
+              className={`panel flex flex-col gap-2 p-4 sm:p-5 ${
                 g.ready
                   ? 'cursor-pointer transition-transform hover:-translate-y-1'
                   : 'opacity-60'

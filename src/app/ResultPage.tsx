@@ -129,16 +129,16 @@ export default function ResultPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-4xl p-3 sm:p-6">
       <ConfettiBurst count={70} />
 
       <div ref={captureRef} className="flex flex-col gap-4">
-        <div className="panel p-6 text-center sm:p-10">
+        <div className="panel p-4 text-center sm:p-10">
           <p className="text-sm font-extrabold text-muted">
             {className && `${className} · `}
             {isQuota ? '정원 추첨' : gameLabel}
           </p>
-          <h1 className="pixel-title pop-win my-3 text-6xl text-pick-purple-600 sm:text-7xl">
+          <h1 className="pixel-title pop-win my-3 text-4xl text-pick-purple-600 sm:text-7xl">
             {isQuota ? '선발 결과' : isOrder ? '순서 결과' : isAssign ? '배정 완료!' : '당첨!'}
           </h1>
 
@@ -194,8 +194,8 @@ export default function ResultPage() {
                 winnerNames.length === 1
                   ? 'grid-cols-1'
                   : winnerNames.length <= 4
-                    ? 'grid-cols-2'
-                    : 'grid-cols-3'
+                    ? 'grid-cols-1 sm:grid-cols-2'
+                    : 'grid-cols-2 sm:grid-cols-3'
               }`}
             >
               {winnerNames.map((name, i) => (
@@ -206,7 +206,7 @@ export default function ResultPage() {
                 >
                   <span
                     className={`font-black text-ink-purple ${
-                      winnerNames.length === 1 ? 'text-6xl sm:text-7xl' : 'text-3xl'
+                      winnerNames.length === 1 ? 'text-4xl sm:text-7xl' : 'text-2xl sm:text-3xl'
                     }`}
                   >
                     {name}
@@ -254,7 +254,7 @@ export default function ResultPage() {
         </div>
 
         {showGroups && canLayout && (
-          <div className="panel p-6">
+          <div className="panel p-4 sm:p-6">
             <p className="mb-3 text-xl font-black text-ink-purple">
               👥 조 배치 <span className="text-sm font-bold text-muted">(순서대로 {groupSize}명씩)</span>
             </p>
@@ -272,7 +272,7 @@ export default function ResultPage() {
         )}
 
         {showSeats && canLayout && (
-          <div className="panel p-6">
+          <div className="panel overflow-x-auto p-4 sm:p-6">
             <p className="mb-3 text-xl font-black text-ink-purple">
               🪑 자리 배치 <span className="text-sm font-bold text-muted">(한 줄 {seatCols}자리)</span>
             </p>
@@ -280,8 +280,8 @@ export default function ResultPage() {
               교탁
             </div>
             <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${seatCols}, minmax(0, 1fr))` }}
+              className="grid min-w-max gap-2"
+              style={{ gridTemplateColumns: `repeat(${seatCols}, minmax(4.5rem, 1fr))` }}
             >
               {layoutSource.map((name, i) => (
                 <div
