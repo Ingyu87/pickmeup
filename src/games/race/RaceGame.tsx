@@ -28,25 +28,63 @@ const COURSES = {
   short: {
     label: '클래식 콩콩맵',
     shortLabel: '클래식',
-    height: 4200,
+    height: 8400,
     bgTop: '#9fdcaa',
     bgBottom: '#e8f8d8',
     deco: ['🌲', '🌳', '🍄', '🌼', '📚'],
-    sections: ['pegs', 'bumpers', 'movers', 'zigzag', 'bricks', 'pegs', 'ramps', 'bumpers'],
+    sections: [
+      'pegs',
+      'bumpers',
+      'movers',
+      'zigzag',
+      'bricks',
+      'pegs',
+      'sweeps',
+      'ramps',
+      'bumpers',
+      'verticals',
+      'bricks',
+      'pegs',
+      'movers',
+      'zigzag',
+      'spinners',
+      'pads',
+    ],
   },
   normal: {
     label: '바람개비 지그재그',
     shortLabel: '지그재그',
-    height: 5900,
+    height: 11800,
     bgTop: '#c3b3f2',
     bgBottom: '#f2ebff',
     deco: ['🌀', '🌷', '🦋', '⭐', '✏️'],
-    sections: ['spinners', 'pegs', 'movers', 'ramps', 'bricks', 'bumpers', 'spinners', 'zigzag', 'pegs', 'pads'],
+    sections: [
+      'spinners',
+      'pegs',
+      'movers',
+      'ramps',
+      'bricks',
+      'bumpers',
+      'verticals',
+      'spinners',
+      'zigzag',
+      'pegs',
+      'sweeps',
+      'pads',
+      'bricks',
+      'holes',
+      'movers',
+      'ramps',
+      'spinners',
+      'pegs',
+      'bumpers',
+      'pads',
+    ],
   },
   long: {
     label: '혼돈의 롱코스',
     shortLabel: '롱코스',
-    height: 8200,
+    height: 16400,
     bgTop: '#0d0d33',
     bgBottom: '#31315e',
     deco: ['⭐', '🪐', '🛸', '✨', '🌙'],
@@ -60,8 +98,21 @@ const COURSES = {
       'movers',
       'bricks',
       'ramps',
+      'sweeps',
       'spinners',
       'holes',
+      'pegs',
+      'pads',
+      'verticals',
+      'bricks',
+      'movers',
+      'zigzag',
+      'holes',
+      'spinners',
+      'ramps',
+      'bumpers',
+      'bricks',
+      'sweeps',
       'pegs',
       'pads',
     ],
@@ -97,6 +148,28 @@ interface Mover {
   vx: number;
 }
 
+interface VerticalMover {
+  type: 'vertical';
+  x: number;
+  y: number;
+  r: number;
+  minY: number;
+  maxY: number;
+  vy: number;
+}
+
+interface Sweep {
+  type: 'sweep';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minX: number;
+  maxX: number;
+  vx: number;
+  color: string;
+}
+
 interface Brick {
   type: 'brick';
   x: number;
@@ -119,7 +192,18 @@ interface Spinner {
   t: number;
 }
 
-type Obstacle = Wall | Peg | Mover | Brick | Spinner;
+type Obstacle = Wall | Peg | Mover | VerticalMover | Sweep | Brick | Spinner;
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+}
 
 interface RunnerState {
   id: string;
@@ -137,6 +221,7 @@ interface RunnerState {
   swallowed: number;
   lastY: number;
   stallMs: number;
+  sideStuckMs: number;
 }
 
 interface CourseMap {
@@ -154,8 +239,20 @@ function obstacleMaxY(o: Obstacle) {
   if (o.type === 'wall') return Math.max(o.y1, o.y2) + o.t / 2;
   if (o.type === 'spinner') return o.y + o.len / 2 + o.t / 2;
   if (o.type === 'brick') return o.y + o.h / 2;
+  if (o.type === 'sweep') return o.y + o.h / 2;
+  if (o.type === 'vertical') return o.maxY + o.r;
   if (o.type === 'pad') return o.y + 70;
   return o.y + o.r;
+}
+
+function obstacleMinY(o: Obstacle) {
+  if (o.type === 'wall') return Math.min(o.y1, o.y2) - o.t / 2;
+  if (o.type === 'spinner') return o.y - o.len / 2 - o.t / 2;
+  if (o.type === 'brick') return o.y - o.h / 2;
+  if (o.type === 'sweep') return o.y - o.h / 2;
+  if (o.type === 'vertical') return o.minY - o.r;
+  if (o.type === 'pad') return o.y - 70;
+  return o.y - o.r;
 }
 
 function addPegGrid(obstacles: Obstacle[], y: number, rows: number, cols: number) {
@@ -210,6 +307,41 @@ function addMovers(obstacles: Obstacle[], y: number, rows: number) {
       minX,
       maxX,
       vx: (i % 2 ? -1 : 1) * (130 + i * 22),
+    });
+  }
+}
+
+function addVerticalMovers(obstacles: Obstacle[], y: number, rows: number) {
+  for (let i = 0; i < rows; i++) {
+    const minY = y + i * 185;
+    const maxY = minY + 135;
+    obstacles.push({
+      type: 'vertical',
+      x: i % 2 ? 660 : 240,
+      y: i % 2 ? maxY : minY,
+      r: 25,
+      minY,
+      maxY,
+      vy: (i % 2 ? -1 : 1) * (120 + i * 18),
+    });
+  }
+}
+
+function addSweeps(obstacles: Obstacle[], y: number, rows: number) {
+  const colors = ['#38BDF8', '#A3E635', '#F97316', '#F9A8D4'];
+  for (let i = 0; i < rows; i++) {
+    const minX = i % 2 ? 210 : 120;
+    const maxX = i % 2 ? 780 : 690;
+    obstacles.push({
+      type: 'sweep',
+      x: i % 2 ? maxX : minX,
+      y: y + i * 185,
+      w: 150,
+      h: 24,
+      minX,
+      maxX,
+      vx: (i % 2 ? -1 : 1) * (150 + i * 20),
+      color: colors[i % colors.length],
     });
   }
 }
@@ -271,6 +403,16 @@ function addSection(obstacles: Obstacle[], key: string, y: number) {
     addMovers(obstacles, y + 80, 4);
     addPegGrid(obstacles, y + 40, 3, 5);
     return y + 760;
+  }
+  if (key === 'verticals') {
+    addVerticalMovers(obstacles, y + 60, 4);
+    addPegGrid(obstacles, y + 40, 3, 5);
+    return y + 780;
+  }
+  if (key === 'sweeps') {
+    addSweeps(obstacles, y + 95, 4);
+    addPegGrid(obstacles, y + 35, 3, 6);
+    return y + 780;
   }
   if (key === 'bricks') {
     addBricks(obstacles, y + 80, 4);
@@ -415,6 +557,55 @@ function collideMover(r: RunnerState, mover: Mover) {
   return true;
 }
 
+function collideVerticalMover(r: RunnerState, mover: VerticalMover) {
+  const dx = r.x - mover.x;
+  const dy = r.y - mover.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const minDist = r.r + mover.r;
+  if (dist >= minDist) return false;
+
+  const nx = dx / dist;
+  const ny = dy / dist;
+  r.x += nx * (minDist - dist);
+  r.y += ny * (minDist - dist);
+  const rvy = r.vy - mover.vy;
+  const vn = r.vx * nx + rvy * ny;
+  if (vn < 0) {
+    r.vx -= (1 + RESTITUTION + 0.42) * vn * nx;
+    r.vy -= (1 + RESTITUTION + 0.42) * vn * ny;
+    r.vy += mover.vy * 0.58;
+    r.vx += (Math.random() - 0.5) * 130;
+  }
+  return true;
+}
+
+function collideSweep(r: RunnerState, sweep: Sweep) {
+  const left = sweep.x - sweep.w / 2;
+  const right = sweep.x + sweep.w / 2;
+  const top = sweep.y - sweep.h / 2;
+  const bottom = sweep.y + sweep.h / 2;
+  const px = clamp(r.x, left, right);
+  const py = clamp(r.y, top, bottom);
+  let nx = r.x - px;
+  let ny = r.y - py;
+  const dist = Math.hypot(nx, ny) || 1;
+  if (dist >= r.r) return false;
+
+  nx /= dist;
+  ny /= dist;
+  r.x += nx * (r.r - dist);
+  r.y += ny * (r.r - dist);
+  const rvx = r.vx - sweep.vx;
+  const vn = rvx * nx + r.vy * ny;
+  if (vn < 0) {
+    r.vx -= (1 + RESTITUTION + 0.35) * vn * nx;
+    r.vy -= (1 + RESTITUTION + 0.35) * vn * ny;
+    r.vx += sweep.vx * 0.55;
+    r.vy -= 70;
+  }
+  return true;
+}
+
 function collideBrick(r: RunnerState, brick: Brick) {
   if (brick.dead) return false;
   const left = brick.x - brick.w / 2;
@@ -469,6 +660,7 @@ export default function RaceGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const runnersRef = useRef<RunnerState[]>([]);
   const finishRef = useRef<number[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
   const rafRef = useRef(0);
   const lastTimeRef = useRef(0);
   const camYRef = useRef(-260);
@@ -493,6 +685,25 @@ export default function RaceGame() {
     x: offX + worldX * scale,
     y: (worldY - camYRef.current) * scale,
   });
+
+  const spawnBurst = (x: number, y: number, color: string, count = 8) => {
+    const particles = particlesRef.current;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 130 + Math.random() * 360;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 90,
+        life: 360 + Math.random() * 420,
+        maxLife: 780,
+        color,
+        size: 4 + Math.random() * 7,
+      });
+    }
+    if (particles.length > 220) particles.splice(0, particles.length - 220);
+  };
 
   const drawScene = (preview = false) => {
     const canvas = canvasRef.current;
@@ -637,6 +848,54 @@ export default function RaceGame() {
         ctx.lineTo(o.maxX, o.y);
         ctx.stroke();
         ctx.setLineDash([]);
+      } else if (o.type === 'vertical') {
+        ctx.strokeStyle = 'rgba(56,189,248,0.34)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(o.x, o.minY);
+        ctx.lineTo(o.x, o.maxY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.fillStyle = '#38BDF8';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(0, 0, o.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(o.vy > 0 ? 'v' : '^', 0, 1);
+        ctx.restore();
+      } else if (o.type === 'sweep') {
+        ctx.strokeStyle = 'rgba(249,115,22,0.28)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 9]);
+        ctx.beginPath();
+        ctx.moveTo(o.minX, o.y);
+        ctx.lineTo(o.maxX, o.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.fillStyle = o.color;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.roundRect(-o.w / 2, -o.h / 2, o.w, o.h, 12);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 18px Pretendard, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(o.vx > 0 ? '>' : '<', 0, 1);
+        ctx.restore();
       } else if (o.type === 'brick') {
         if (o.dead) return;
         ctx.fillStyle = o.color;
@@ -669,6 +928,17 @@ export default function RaceGame() {
       }
     });
 
+    particlesRef.current.forEach((p) => {
+      if (p.y < viewTop - 120 || p.y > viewBottom + 120) return;
+      const alpha = clamp(p.life / p.maxLife, 0, 1);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (0.65 + alpha * 0.35), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
     const cell = 30;
     for (let x = LEFT_WALL; x < RIGHT_WALL; x += cell) {
       ctx.fillStyle = Math.floor((x - LEFT_WALL) / cell) % 2 ? '#2D3748' : '#FFFFFF';
@@ -695,6 +965,7 @@ export default function RaceGame() {
           swallowed: 0,
           lastY: 0,
           stallMs: 0,
+          sideStuckMs: 0,
         }))
       : runnersRef.current;
 
@@ -747,6 +1018,7 @@ export default function RaceGame() {
   const resetPreview = () => {
     finishRef.current = [];
     runnersRef.current = [];
+    particlesRef.current = [];
     camYRef.current = -260;
     gateOpenRef.current = false;
     drawScene(true);
@@ -765,6 +1037,8 @@ export default function RaceGame() {
     const rubber = clamp((meanY - runner.y) / 1600, -0.18, 0.42);
     runner.vy += GRAVITY * (1 + rubber) * dt;
     runner.vx += (Math.random() - 0.5) * 120 * dt;
+    if (runner.x < LEFT_WALL + runner.r + 42) runner.vx += 900 * dt;
+    if (runner.x > RIGHT_WALL - runner.r - 42) runner.vx -= 900 * dt;
     runner.vx *= 0.998;
     runner.vy = clamp(runner.vy, -MAX_SPEED, MAX_SPEED);
     runner.x += runner.vx * dt;
@@ -787,8 +1061,15 @@ export default function RaceGame() {
     }
 
     courseMap.obstacles.forEach((o) => {
+      if (obstacleMaxY(o) < runner.y - 280 || obstacleMinY(o) > runner.y + 420) return;
       if (o.type === 'wall') {
-        collideSegment(runner, o.x1, o.y1, o.x2, o.y2, o.t);
+        if (collideSegment(runner, o.x1, o.y1, o.x2, o.y2, o.t)) {
+          const nearSide = runner.x < LEFT_WALL + runner.r + 45 || runner.x > RIGHT_WALL - runner.r - 45;
+          if (nearSide && Math.abs(runner.vx) < 180) {
+            runner.vx += runner.x < WORLD_W / 2 ? 260 : -260;
+            runner.vy = Math.max(runner.vy, 160);
+          }
+        }
       } else if (o.type === 'spinner') {
         for (let i = 0; i < o.arms; i++) {
           const a = o.angle + (Math.PI * 2 * i) / o.arms;
@@ -814,20 +1095,44 @@ export default function RaceGame() {
           runner.vx += (Math.random() - 0.5) * 180 * dt;
         }
       } else if (o.type === 'mover') {
-        collideMover(runner, o);
+        if (collideMover(runner, o) && Math.random() < 0.2) spawnBurst(runner.x, runner.y, '#FB7185', 3);
+      } else if (o.type === 'vertical') {
+        if (collideVerticalMover(runner, o) && Math.random() < 0.2) spawnBurst(runner.x, runner.y, '#38BDF8', 3);
+      } else if (o.type === 'sweep') {
+        if (collideSweep(runner, o) && Math.random() < 0.22) spawnBurst(runner.x, runner.y, o.color, 3);
       } else if (o.type === 'brick') {
-        collideBrick(runner, o);
+        const hpBefore = o.hp;
+        if (collideBrick(runner, o) && o.dead && hpBefore > 0) spawnBurst(o.x, o.y, o.color, 14);
       } else {
         collideCircle(runner, o);
       }
     });
 
-    const nearFinish = runner.y > courseMap.finishY - 900;
+    const nearLeftSide = runner.x < LEFT_WALL + runner.r + 24;
+    const nearRightSide = runner.x > RIGHT_WALL - runner.r - 24;
+    const sideLowMotion = Math.abs(runner.vx) < 150 && Math.abs(runner.vy) < 260;
+    if ((nearLeftSide || nearRightSide) && sideLowMotion) {
+      runner.sideStuckMs += dt * 1000;
+    } else {
+      runner.sideStuckMs = Math.max(0, runner.sideStuckMs - dt * 1800);
+    }
+
+    if (runner.sideStuckMs > 380) {
+      const pushRight = nearLeftSide || runner.x < WORLD_W / 2;
+      runner.x = clamp(runner.x + (pushRight ? 34 : -34), LEFT_WALL + runner.r, RIGHT_WALL - runner.r);
+      runner.vx = pushRight ? Math.max(runner.vx, 390) : Math.min(runner.vx, -390);
+      runner.vy = Math.max(runner.vy, 360);
+      runner.sideStuckMs = 0;
+      spawnBurst(runner.x, runner.y, '#A3E635', 5);
+    }
+
     const progressed = runner.y - beforeY;
-    if (nearFinish && progressed < 1.2 && Math.abs(runner.vy) < 160) {
+    const nearFinish = runner.y > courseMap.finishY - 900;
+    const slowProgress = runner.y > 360 && progressed < 1.4 && Math.abs(runner.vy) < 220;
+    if ((nearFinish || slowProgress) && progressed < 1.8) {
       runner.stallMs += dt * 1000;
     } else {
-      runner.stallMs = 0;
+      runner.stallMs = Math.max(0, runner.stallMs - dt * 2200);
     }
 
     if (nearFinish) {
@@ -835,10 +1140,11 @@ export default function RaceGame() {
       runner.vx += (WORLD_W / 2 - runner.x) * 0.35 * dt;
     }
 
-    if (runner.stallMs > 650) {
-      runner.vy = Math.max(runner.vy, 360);
-      runner.vx += (Math.random() - 0.5) * 260;
+    if (runner.stallMs > 520) {
+      runner.vy = Math.max(runner.vy, nearFinish ? 520 : 430);
+      runner.vx += (WORLD_W / 2 - runner.x) * 0.8 + (Math.random() - 0.5) * 320;
       runner.stallMs = 0;
+      spawnBurst(runner.x, runner.y, '#FACC15', 4);
     }
 
     runner.lastY = runner.y;
@@ -878,9 +1184,11 @@ export default function RaceGame() {
         swallowed: 0,
         lastY: 230 - row * 44,
         stallMs: 0,
+        sideStuckMs: 0,
       };
     });
     finishRef.current = [];
+    particlesRef.current = [];
     camYRef.current = -260;
     gateOpenRef.current = false;
     lastTimeRef.current = 0;
@@ -911,7 +1219,38 @@ export default function RaceGame() {
             o.vx = -Math.abs(o.vx);
           }
         }
+        if (o.type === 'vertical') {
+          o.y += o.vy * dt;
+          if (o.y < o.minY) {
+            o.y = o.minY;
+            o.vy = Math.abs(o.vy);
+          }
+          if (o.y > o.maxY) {
+            o.y = o.maxY;
+            o.vy = -Math.abs(o.vy);
+          }
+        }
+        if (o.type === 'sweep') {
+          o.x += o.vx * dt;
+          if (o.x < o.minX) {
+            o.x = o.minX;
+            o.vx = Math.abs(o.vx);
+          }
+          if (o.x > o.maxX) {
+            o.x = o.maxX;
+            o.vx = -Math.abs(o.vx);
+          }
+        }
       });
+      particlesRef.current = particlesRef.current
+        .map((p) => ({
+          ...p,
+          x: p.x + p.vx * dt,
+          y: p.y + p.vy * dt,
+          vy: p.vy + 520 * dt,
+          life: p.life - dt * 1000,
+        }))
+        .filter((p) => p.life > 0);
 
       const activeRunners = runnersRef.current.filter((r) => !r.finished);
       const meanY = activeRunners.length
@@ -964,6 +1303,7 @@ export default function RaceGame() {
         swallowed: 0,
         lastY: courseMap.finishY,
         stallMs: 0,
+        sideStuckMs: 0,
       }));
       finishRef.current = runnersRef.current.map((_, i) => i);
       camYRef.current = courseMap.finishY - 760;
