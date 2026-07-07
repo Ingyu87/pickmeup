@@ -560,6 +560,29 @@ export default function RaceGame() {
                   레이스는 가중치 없이 모두 같은 조건으로 달려요
                 </p>
               )}
+              <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-3">
+                {(Object.entries(COURSES) as [CourseId, (typeof COURSES)[CourseId]][]).map(
+                  ([id, c]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="rounded-2xl border-2 bg-white/90 px-4 py-3 text-sm font-black text-ink-purple shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                      data-selected={courseId === id}
+                      disabled={phase !== 'setup'}
+                      onClick={() => updateRace({ mapId: id })}
+                      style={{
+                        borderColor: courseId === id ? '#A3E635' : 'rgba(124, 58, 237, 0.18)',
+                        background:
+                          courseId === id
+                            ? 'linear-gradient(180deg, rgba(244,255,208,0.96), rgba(255,255,255,0.92))'
+                            : 'rgba(255,255,255,0.9)',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  ),
+                )}
+              </div>
             </div>
           )}
         </div>
