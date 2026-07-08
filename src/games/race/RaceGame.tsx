@@ -522,15 +522,6 @@ export default function RaceGame() {
       ctx.fillText(runner.name.slice(0, 5), runner.x, runner.y + runner.r + 18);
     });
 
-    if (phaseRef.current === 'setup') {
-      ctx.fillStyle = courseId === 'long' ? '#FFFFFF' : '#2F1954';
-      ctx.font = '900 42px Pretendard, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('긴 맵 레이스 준비 완료', WORLD_W / 2, 555);
-      ctx.font = '800 24px Pretendard, sans-serif';
-      ctx.fillText('구슬이 장애물을 통과해 결승선까지 내려갑니다', WORLD_W / 2, 598);
-    }
-
     ctx.restore();
 
     const progress = clamp((camYRef.current + height / scale) / courseMap.finishY, 0, 1);
@@ -841,28 +832,6 @@ export default function RaceGame() {
                   레이스는 가중치 없이 모두 같은 조건으로 달려요
                 </p>
               )}
-              <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-3">
-                {(Object.entries(COURSES) as [CourseId, (typeof COURSES)[CourseId]][]).map(
-                  ([id, c]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className="rounded-2xl border-2 bg-white/90 px-4 py-3 text-sm font-black text-ink-purple shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={phase !== 'setup'}
-                      onClick={() => updateRace({ mapId: id })}
-                      style={{
-                        borderColor: courseId === id ? '#A3E635' : 'rgba(124, 58, 237, 0.18)',
-                        background:
-                          courseId === id
-                            ? 'linear-gradient(180deg, rgba(244,255,208,0.96), rgba(255,255,255,0.92))'
-                            : 'rgba(255,255,255,0.9)',
-                      }}
-                    >
-                      {c.label}
-                    </button>
-                  ),
-                )}
-              </div>
             </div>
           )}
         </div>
