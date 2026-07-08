@@ -58,13 +58,8 @@ export default function WheelGame() {
     () => (settings.missions ?? []).map((m) => m.trim()).filter(Boolean),
     [settings.missions],
   );
-  const missionItems = useMemo<Participant[]>(
-    () => missions.map((m, i) => ({ id: `mission-${i}`, name: m, weight: 1 })),
-    [missions],
-  );
-  const wheelSource = wheelMode === 'missions' ? missionItems : active;
 
-  const [wheelPs, setWheelPs] = useState<Participant[]>(wheelSource);
+  const [wheelPs, setWheelPs] = useState<Participant[]>(active);
   const [winners, setWinners] = useState<Participant[]>([]);
   const [assignments, setAssignments] = useState<{ name: string; label: string }[]>([]);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -76,11 +71,13 @@ export default function WheelGame() {
   soundRef.current = soundEnabled;
 
   useEffect(() => {
-    setWheelPs(wheelSource);
+    setWheelPs(active);
     setWinners([]);
     setAssignments([]);
     setPhase('idle');
-  }, [wheelSource]);
+  }, [active, wheelMode]);
+
+  const currentMission = wheelMode === 'missions' ? missions[assignments.length] : undefined;
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
@@ -88,7 +85,7 @@ export default function WheelGame() {
   const winnerCount = Math.min(Math.max(1, settings.winnerCount), active.length);
   const lastWinner = winners[winners.length - 1];
 
-  const spinWith = (list: Participant[]) => {
+  const spinWith = (list: Participant[], mission?: string) => {
     const localSlices = buildSlices(list);
     const winner = pickWeighted(list);
     if (!winner) return;
@@ -132,6 +129,9 @@ export default function WheelGame() {
       } else {
         setPhase('landed');
         setWinners((w) => [...w, winner]);
+        if (mission) {
+          setAssignments((a) => [...a, { name: winner.name, label: mission }]);
+        }
         winSfx(soundRef.current);
       }
     };
@@ -140,7 +140,8 @@ export default function WheelGame() {
 
   const spin = () => {
     if (phase === 'spinning' || wheelPs.length < 2) return;
-    spinWith(wheelPs);
+    if (wheelMode === 'missions' && !currentMission) return;
+    spinWith(wheelPs, currentMission);
   };
 
   const nextSpin = () => {
@@ -151,22 +152,13 @@ export default function WheelGame() {
     spinWith(next);
   };
 
-  const assignWorker = () => {
-    if (!lastWinner) return;
-    const taken = new Set(assignments.map((a) => a.name));
-    const pool = active.filter((p) => !taken.has(p.name));
-    const pick = pickWeighted(pool.length > 0 ? pool : active);
-    if (!pick) return;
-    setAssignments((a) => [...a, { name: pick.name, label: lastWinner.name }]);
-    winSfx(soundRef.current);
-  };
-
-  const nextMission = () => {
-    if (!lastWinner) return;
+  const nextMissionSpin = () => {
+    if (!lastWinner || !currentMission) return;
     const next = wheelPs.filter((p) => p.id !== lastWinner.id);
+    if (next.length < 2) return;
     setWheelPs(next);
     setPhase('idle');
-    if (next.length >= 2) spinWith(next);
+    spinWith(next, currentMission);
   };
 
   const finish = () => {
@@ -190,7 +182,7 @@ export default function WheelGame() {
 
   const restart = () => {
     cancelAnimationFrame(rafRef.current);
-    setWheelPs(wheelSource);
+    setWheelPs(active);
     setWinners([]);
     setAssignments([]);
     setPhase('idle');
@@ -209,6 +201,8 @@ export default function WheelGame() {
           winners.length < winnerCount
         ) {
           nextSpin();
+        } else if (wheelMode === 'missions' && phase === 'landed' && currentMission) {
+          nextMissionSpin();
         }
       }
     };
@@ -301,22 +295,44 @@ export default function WheelGame() {
           )}
         </div>
 
+        {wheelMode === 'missions' && phase !== 'landed' && (
+          <div className="rounded-2xl bg-surface-lavender px-6 py-3 text-center">
+            {currentMission ? (
+              <>
+                <p className="text-sm font-bold text-muted">
+                  미션 {assignments.length + 1} / {missions.length}
+                </p>
+                <p className="text-2xl font-black text-ink-purple">📋 {currentMission}</p>
+                <p className="mt-1 text-sm font-bold text-pick-purple-600">
+                  이 미션의 담당자를 돌림판으로 뽑아요!
+                </p>
+              </>
+            ) : (
+              <p className="text-base font-bold text-muted">
+                {missions.length === 0
+                  ? '오른쪽에서 미션을 먼저 입력해 주세요'
+                  : '모든 미션 배정 완료! 결과를 확인하세요 🎉'}
+              </p>
+            )}
+          </div>
+        )}
+
         {phase === 'landed' && lastWinner && (
           <div className="pop-win rounded-2xl bg-surface-lime px-8 py-4 text-center">
-            <p className="pixel-title text-xl text-pick-purple-600">
-              {wheelMode === 'missions' ? '📋 미션!' : '당첨!'}
-            </p>
-            <p className="text-4xl font-black text-ink-purple">{lastWinner.name}</p>
-            {wheelMode === 'missions' &&
-              assignments.filter((a) => a.label === lastWinner.name).length > 0 && (
-                <p className="mt-1 text-lg font-extrabold text-pick-purple-600">
-                  →{' '}
-                  {assignments
-                    .filter((a) => a.label === lastWinner.name)
-                    .map((a) => a.name)
-                    .join(', ')}
+            {wheelMode === 'missions' && assignments.length > 0 ? (
+              <>
+                <p className="pixel-title text-xl text-pick-purple-600">배정 완료!</p>
+                <p className="text-3xl font-black text-ink-purple sm:text-4xl">
+                  {assignments[assignments.length - 1].label} →{' '}
+                  {assignments[assignments.length - 1].name}
                 </p>
-              )}
+              </>
+            ) : (
+              <>
+                <p className="pixel-title text-xl text-pick-purple-600">당첨!</p>
+                <p className="text-4xl font-black text-ink-purple">{lastWinner.name}</p>
+              </>
+            )}
           </div>
         )}
 
@@ -326,7 +342,7 @@ export default function WheelGame() {
               type="button"
               className="btn-primary px-8 text-2xl sm:px-12 sm:text-3xl"
               onClick={spin}
-              disabled={wheelPs.length < 2}
+              disabled={wheelPs.length < 2 || (wheelMode === 'missions' && !currentMission)}
             >
               돌리기!
             </button>
@@ -336,19 +352,17 @@ export default function WheelGame() {
               다음 스핀 ({winners.length}/{winnerCount})
             </button>
           )}
-          {wheelMode === 'missions' && phase === 'landed' && (
-            <>
-              <button type="button" className="btn-primary" onClick={assignWorker}>
-                👤 담당자 뽑기
-              </button>
-              {wheelPs.length > 1 && (
-                <button type="button" className="btn-secondary" onClick={nextMission}>
-                  다음 미션 돌리기
-                </button>
-              )}
-            </>
+          {wheelMode === 'missions' && phase === 'landed' && currentMission && (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={nextMissionSpin}
+              disabled={wheelPs.length - 1 < 2}
+            >
+              다음 미션: {currentMission} ({assignments.length + 1}/{missions.length})
+            </button>
           )}
-          {(done || (wheelMode === 'missions' && assignments.length > 0)) && (
+          {(done || (wheelMode === 'missions' && assignments.length > 0 && phase === 'landed')) && (
             <button type="button" className="btn-primary px-8 text-xl sm:px-10 sm:text-2xl" onClick={finish}>
               결과 보기 →
             </button>
@@ -362,9 +376,7 @@ export default function WheelGame() {
 
         {wheelPs.length < 2 && phase === 'idle' && (
           <p className="text-sm font-bold text-danger">
-            {wheelMode === 'missions'
-              ? '미션을 2개 이상 입력하면 돌릴 수 있어요'
-              : '돌림판은 2명 이상일 때 돌릴 수 있어요'}
+            돌림판은 2명 이상일 때 돌릴 수 있어요
           </p>
         )}
       </section>
@@ -379,7 +391,7 @@ export default function WheelGame() {
 
         <p className="mb-4 rounded-xl bg-surface-lavender px-3 py-2 text-sm font-bold text-ink-purple">
           {wheelMode === 'missions'
-            ? '멈춘 칸의 미션을 뽑고, 담당자까지 정할 수 있어요!'
+            ? '미션이 하나씩 나오고, 돌림판을 돌려 담당 친구를 정해요! (뽑힌 친구는 다음 판에서 빠져요)'
             : '돌림판을 돌려서 멈춘 칸의 친구가 당첨이에요!'}
         </p>
 
