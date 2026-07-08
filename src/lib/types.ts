@@ -49,6 +49,7 @@ export interface PersistedAppState {
   preferences: { soundEnabled: boolean; bgmEnabled: boolean };
   gameSettings: GameSettings;
   lastResult: DrawResult | null;
+  winStreak?: { name: string; count: number } | null;
 }
 
 export function defaultGameSettings(): GameSettings {

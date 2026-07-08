@@ -19,6 +19,7 @@ export default function ResultPage() {
   const participants = useAppStore((s) => s.participants);
   const className = useAppStore((s) => s.className);
   const excludeIds = useAppStore((s) => s.excludeIds);
+  const winStreak = useAppStore((s) => s.winStreak);
   const captureRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [showGroups, setShowGroups] = useState(false);
@@ -154,6 +155,15 @@ export default function ResultPage() {
           <h1 className="pixel-title pop-win my-3 text-4xl text-pick-purple-600 sm:text-7xl">
             {isQuota ? '선발 결과' : isOrder ? '순서 결과' : isAssign ? '배정 완료!' : '당첨!'}
           </h1>
+
+          {lastResult.winners.length === 1 &&
+            winStreak &&
+            winStreak.count >= 2 &&
+            winnerNames[0] === winStreak.name && (
+              <p className="pop-win mx-auto mb-4 inline-block rounded-full bg-gradient-to-b from-[#FFF6A8] to-pick-yellow-400 px-5 py-2 text-lg font-black text-ink">
+                🔥 {winStreak.name} {winStreak.count}연승!
+              </p>
+            )}
 
           {isQuota && lastResult.quota && (
             <div className="mx-auto mb-6 max-w-2xl rounded-2xl bg-surface-lavender px-4 py-3 text-center">

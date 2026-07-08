@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:race": "node --experimental-strip-types scripts/race-fairness.mjs"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",

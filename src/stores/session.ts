@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { parseRoster } from '../lib/parseRoster';
+import { displayName, parseRoster } from '../lib/parseRoster';
 import {
   clearState,
   loadState,
@@ -26,6 +26,7 @@ interface AppStore {
   bgmEnabled: boolean;
   gameSettings: GameSettings;
   lastResult: DrawResult | null;
+  winStreak: { name: string; count: number } | null;
 
   saveStatus: SaveStatus;
   lastSavedAt: number | null;
@@ -73,6 +74,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   bgmEnabled: persisted?.preferences.bgmEnabled ?? false,
   gameSettings: mergeSettings(persisted?.gameSettings),
   lastResult: persisted?.lastResult ?? null,
+  winStreak: persisted?.winStreak ?? null,
 
   saveStatus: available ? (persisted ? 'saved' : 'idle') : 'unavailable',
   lastSavedAt: persisted?.savedAt ?? null,
@@ -146,7 +148,17 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       },
     }),
 
-  setLastResult: (r) => set({ lastResult: r }),
+  setLastResult: (r) => {
+    let winStreak = get().winStreak;
+    if (r && r.winners.length === 1) {
+      const first = displayName(get().participants, r.winners[0]);
+      winStreak =
+        winStreak && winStreak.name === first
+          ? { name: first, count: winStreak.count + 1 }
+          : { name: first, count: 1 };
+    }
+    set({ lastResult: r, winStreak });
+  },
 
   excludeIds: (ids) =>
     set({ excludedIds: [...new Set([...get().excludedIds, ...ids])] }),
@@ -163,6 +175,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       bgmEnabled: false,
       gameSettings: defaultGameSettings(),
       lastResult: null,
+      winStreak: null,
       saveStatus: available ? 'idle' : 'unavailable',
       lastSavedAt: null,
     });
@@ -178,6 +191,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       bgmEnabled: s.preferences.bgmEnabled,
       gameSettings: mergeSettings(s.gameSettings),
       lastResult: s.lastResult,
+      winStreak: s.winStreak ?? null,
     });
   },
 }));
@@ -195,6 +209,7 @@ function snapshot(s: AppStore): Omit<PersistedAppState, 'savedAt'> {
     preferences: { soundEnabled: s.soundEnabled, bgmEnabled: s.bgmEnabled },
     gameSettings: s.gameSettings,
     lastResult: s.lastResult,
+    winStreak: s.winStreak,
   };
 }
 
