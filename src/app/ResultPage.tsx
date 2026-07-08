@@ -66,6 +66,17 @@ export default function ResultPage() {
   const gameLabel = GAME_LABELS[lastResult.gameId];
   const canLayout = !isQuota && layoutSource.length >= 4;
 
+  const hasWeights = participants.some((p) => p.weight > 1);
+  const fairnessLabel = isQuota
+    ? '균등 무작위 (가중치 미적용)'
+    : lastResult.gameId === 'race'
+      ? '물리 시뮬레이션 (가중치 미적용)'
+      : lastResult.gameId === 'ladder'
+        ? '무작위 사다리 (가중치 미적용)'
+        : hasWeights
+          ? '가중치 반영 무작위'
+          : '균등 무작위';
+
   const copyText = () => {
     const lines = [
       `[픽미업!] ${className ? `${className} · ` : ''}${isQuota ? '정원 추첨' : gameLabel} 결과`,
@@ -95,7 +106,9 @@ export default function ResultPage() {
         lines.push(`${i + 1}조: ${g.join(', ')}`),
       );
     }
-    lines.push(new Date(lastResult.drawnAt).toLocaleString('ko-KR'));
+    lines.push(
+      `🔒 공정 추첨 · ${fairnessLabel} · ${new Date(lastResult.drawnAt).toLocaleString('ko-KR')}`,
+    );
     void navigator.clipboard
       .writeText(lines.join('\n'))
       .then(() => showToast('결과를 복사했어요'))
@@ -251,6 +264,15 @@ export default function ResultPage() {
           )}
 
           <RobotFigure scene="celebrate" className="mx-auto w-40 sm:w-52" />
+
+          <p className="mt-4 border-t border-ink-purple/10 pt-3 text-xs font-bold text-muted">
+            🔒 공정 추첨 · {fairnessLabel} ·{' '}
+            {new Date(lastResult.drawnAt).toLocaleString('ko-KR', {
+              dateStyle: 'short',
+              timeStyle: 'short',
+            })}{' '}
+            · 픽미업!
+          </p>
         </div>
 
         {showGroups && canLayout && (

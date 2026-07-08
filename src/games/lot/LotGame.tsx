@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ConfettiBurst from '../../components/ConfettiBurst';
 import LazyLottie from '../../components/lottie/LazyLottie';
@@ -21,6 +21,9 @@ export default function LotGame() {
   const [phase, setPhase] = useState<Phase>('setup');
   const [drawn, setDrawn] = useState<Participant[]>([]);
   const [revealed, setRevealed] = useState(0);
+  const [fx, setFx] = useState<{ name: string; seq: number } | null>(null);
+  const fxSeqRef = useRef(0);
+  const fxTimerRef = useRef<number | undefined>(undefined);
 
   const active = activeParticipants(participants, excludedIds);
   const quotaCapacity = Math.min(Math.max(1, settings.count), active.length);
@@ -50,14 +53,26 @@ export default function LotGame() {
           );
     setDrawn(winners);
     setPhase('drawing');
+    const batchReveal =
+      settings.revealMode === 'batch' || settings.mode === 'quota';
     setTimeout(() => {
       setPhase('reveal');
-      setRevealed(settings.revealMode === 'batch' || settings.mode === 'quota' ? winners.length : 1);
+      setRevealed(batchReveal ? winners.length : 1);
+      if (!batchReveal && winners[0]) showPaperFx(winners[0].name);
       winSfx(soundEnabled);
     }, 900);
   };
 
+  const showPaperFx = (name: string) => {
+    fxSeqRef.current += 1;
+    setFx({ name, seq: fxSeqRef.current });
+    window.clearTimeout(fxTimerRef.current);
+    fxTimerRef.current = window.setTimeout(() => setFx(null), 1250);
+  };
+
   const revealNext = () => {
+    const next = drawn[revealed];
+    if (next) showPaperFx(next.name);
     setRevealed((n) => Math.min(n + 1, drawn.length));
     winSfx(soundEnabled);
   };
@@ -114,13 +129,21 @@ export default function LotGame() {
       {allRevealed && <ConfettiBurst count={40} />}
 
       <section className="panel game-stage relative flex flex-col items-center justify-center gap-4 overflow-hidden p-4 sm:gap-6 sm:p-6">
-        {phase === 'reveal' && (
+        {phase === 'reveal' && fx && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-            <LazyLottie
-              key={revealed}
-              src="/lottie/lot/reveal-paper/lottie.json"
-              className="w-72"
-            />
+            <div className="relative">
+              <LazyLottie
+                key={fx.seq}
+                src="/lottie/lot/reveal-paper/lottie.json"
+                className="w-72"
+              />
+              <span
+                className="pop-win absolute inset-0 flex items-center justify-center text-3xl font-black text-ink-purple"
+                style={{ animationDelay: '0.35s' }}
+              >
+                {fx.name}
+              </span>
+            </div>
           </div>
         )}
         {phase === 'setup' && (
