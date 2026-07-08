@@ -35,23 +35,30 @@ const COURSES = {
     sections: [
       'pegs',
       'bumpers',
+      'gates',
       'movers',
       'zigzag',
+      'zones',
       'bricks',
       'pegs',
       'sweeps',
+      'portals',
       'ramps',
       'bumpers',
       'verticals',
+      'tramps',
       'bricks',
       'pegs',
       'movers',
+      'gates',
       'zigzag',
       'spinners',
       'pads',
+      'zones',
       'bricks',
       'verticals',
       'sweeps',
+      'portals',
       'pegs',
       'bumpers',
       'ramps',
@@ -67,29 +74,38 @@ const COURSES = {
     sections: [
       'spinners',
       'pegs',
+      'gates',
       'movers',
       'ramps',
+      'portals',
       'bricks',
       'bumpers',
+      'zones',
       'verticals',
       'spinners',
       'zigzag',
+      'tramps',
       'pegs',
       'sweeps',
       'pads',
+      'gates',
       'bricks',
       'holes',
+      'portals',
       'movers',
       'ramps',
       'spinners',
+      'zones',
       'pegs',
       'bumpers',
       'pads',
+      'tramps',
       'zigzag',
       'verticals',
       'bricks',
       'sweeps',
       'holes',
+      'gates',
       'movers',
       'pegs',
       'pads',
@@ -105,35 +121,47 @@ const COURSES = {
     sections: [
       'pegs',
       'holes',
+      'gates',
       'spinners',
       'pads',
+      'portals',
       'zigzag',
       'bumpers',
+      'zones',
       'movers',
       'bricks',
+      'tramps',
       'ramps',
       'sweeps',
       'spinners',
       'holes',
+      'gates',
       'pegs',
       'pads',
+      'portals',
       'verticals',
       'bricks',
+      'zones',
       'movers',
       'zigzag',
       'holes',
+      'tramps',
       'spinners',
       'ramps',
       'bumpers',
+      'gates',
       'bricks',
       'sweeps',
+      'portals',
       'pegs',
       'pads',
+      'zones',
       'verticals',
       'holes',
       'bricks',
       'movers',
       'spinners',
+      'tramps',
       'zigzag',
       'sweeps',
       'ramps',
@@ -217,7 +245,65 @@ interface Spinner {
   t: number;
 }
 
-type Obstacle = Wall | Peg | Mover | VerticalMover | Sweep | Brick | Spinner;
+interface Portal {
+  type: 'portal';
+  x: number;
+  y: number;
+  r: number;
+}
+
+interface BoostZone {
+  type: 'boost';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface MudZone {
+  type: 'mud';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface Gate {
+  type: 'gate';
+  y: number;
+  gaps: number[];
+  gapW: number;
+  period: number;
+  phase: number;
+  t: number;
+  clock: number;
+}
+
+interface Tramp {
+  type: 'tramp';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+type Obstacle =
+  | Wall
+  | Peg
+  | Mover
+  | VerticalMover
+  | Sweep
+  | Brick
+  | Spinner
+  | Portal
+  | BoostZone
+  | MudZone
+  | Gate
+  | Tramp;
+
+function gateIsOpen(gate: Gate) {
+  return ((gate.clock + gate.phase) % gate.period) < gate.period * 0.55;
+}
 
 interface Particle {
   x: number;
@@ -247,6 +333,7 @@ interface RunnerState {
   lastY: number;
   stallMs: number;
   sideStuckMs: number;
+  portalCoolMs: number;
 }
 
 interface CourseMap {
@@ -263,8 +350,9 @@ function clamp(n: number, min: number, max: number) {
 function obstacleMaxY(o: Obstacle) {
   if (o.type === 'wall') return Math.max(o.y1, o.y2) + o.t / 2;
   if (o.type === 'spinner') return o.y + o.len / 2 + o.t / 2;
-  if (o.type === 'brick') return o.y + o.h / 2;
-  if (o.type === 'sweep') return o.y + o.h / 2;
+  if (o.type === 'brick' || o.type === 'sweep' || o.type === 'tramp') return o.y + o.h / 2;
+  if (o.type === 'boost' || o.type === 'mud') return o.y + o.h / 2;
+  if (o.type === 'gate') return o.y + o.t;
   if (o.type === 'vertical') return o.maxY + o.r;
   if (o.type === 'pad') return o.y + 70;
   return o.y + o.r;
@@ -273,8 +361,9 @@ function obstacleMaxY(o: Obstacle) {
 function obstacleMinY(o: Obstacle) {
   if (o.type === 'wall') return Math.min(o.y1, o.y2) - o.t / 2;
   if (o.type === 'spinner') return o.y - o.len / 2 - o.t / 2;
-  if (o.type === 'brick') return o.y - o.h / 2;
-  if (o.type === 'sweep') return o.y - o.h / 2;
+  if (o.type === 'brick' || o.type === 'sweep' || o.type === 'tramp') return o.y - o.h / 2;
+  if (o.type === 'boost' || o.type === 'mud') return o.y - o.h / 2;
+  if (o.type === 'gate') return o.y - o.t;
   if (o.type === 'vertical') return o.minY - o.r;
   if (o.type === 'pad') return o.y - 70;
   return o.y - o.r;
@@ -393,7 +482,56 @@ function addBricks(obstacles: Obstacle[], y: number, rows: number) {
   }
 }
 
+function addPortals(obstacles: Obstacle[], y: number) {
+  obstacles.push(
+    { type: 'portal', x: 250, y: y + 150, r: 36 },
+    { type: 'portal', x: 650, y: y + 340, r: 36 },
+  );
+  addPegGrid(obstacles, y + 60, 3, 6);
+}
+
+function addZones(obstacles: Obstacle[], y: number) {
+  obstacles.push(
+    { type: 'boost', x: 262, y: y + 200, w: 250, h: 310 },
+    { type: 'mud', x: 638, y: y + 200, w: 250, h: 310 },
+    { type: 'mud', x: 262, y: y + 580, w: 250, h: 310 },
+    { type: 'boost', x: 638, y: y + 580, w: 250, h: 310 },
+  );
+}
+
+function addGates(obstacles: Obstacle[], y: number) {
+  obstacles.push(
+    { type: 'gate', y: y + 180, gaps: [235, 665], gapW: 120, period: 2.6, phase: 0, t: 18, clock: 0 },
+    { type: 'gate', y: y + 480, gaps: [450], gapW: 135, period: 2.2, phase: 1.1, t: 18, clock: 0 },
+  );
+  addPegGrid(obstacles, y + 250, 2, 5);
+}
+
+function addTramps(obstacles: Obstacle[], y: number) {
+  obstacles.push(
+    { type: 'tramp', x: 300, y: y + 210, w: 190, h: 22 },
+    { type: 'tramp', x: 620, y: y + 450, w: 190, h: 22 },
+  );
+  addPegGrid(obstacles, y + 60, 2, 6);
+}
+
 function addSection(obstacles: Obstacle[], key: string, y: number) {
+  if (key === 'portals') {
+    addPortals(obstacles, y);
+    return y + 650;
+  }
+  if (key === 'zones') {
+    addZones(obstacles, y);
+    return y + 850;
+  }
+  if (key === 'gates') {
+    addGates(obstacles, y);
+    return y + 700;
+  }
+  if (key === 'tramps') {
+    addTramps(obstacles, y);
+    return y + 660;
+  }
   if (key === 'pegs') {
     addPegGrid(obstacles, y, 5, 7);
     return y + 560;
@@ -693,6 +831,18 @@ export default function RaceGame() {
   const phaseRef = useRef<Phase>('setup');
   const fastForwardRef = useRef(false);
   fastForwardRef.current = fastForward;
+  const tickerRef = useRef({ text: '', until: 0, lastAt: 0 });
+  const lastLeaderRef = useRef<string | null>(null);
+  const slowmoRef = useRef(false);
+  const zoomRef = useRef(1);
+  const flashRef = useRef(0);
+  const raceStartRef = useRef(0);
+
+  const announce = (text: string, priority = false) => {
+    const now = performance.now();
+    if (!priority && now - tickerRef.current.lastAt < 1200) return;
+    tickerRef.current = { text, until: now + 2600, lastAt: now };
+  };
 
   const courseId = (settings.mapId in COURSES ? settings.mapId : 'normal') as CourseId;
   const course = COURSES[courseId];
@@ -748,7 +898,7 @@ export default function RaceGame() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    const scale = Math.min(width / WORLD_W, height / 1040);
+    const scale = Math.min(width / WORLD_W, height / 1040) * (preview ? 1 : zoomRef.current);
     const offX = (width - WORLD_W * scale) / 2;
     const viewTop = camYRef.current;
     const viewBottom = viewTop + height / scale;
@@ -935,6 +1085,120 @@ export default function RaceGame() {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(o.hp > 1 ? '◆' : '×', o.x, o.y + 1);
+      } else if (o.type === 'portal') {
+        const t = performance.now() / 1000;
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        const g = ctx.createRadialGradient(0, 0, 4, 0, 0, o.r + 12);
+        g.addColorStop(0, 'rgba(240,171,252,0.85)');
+        g.addColorStop(1, 'rgba(168,85,247,0.12)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, o.r + 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.rotate(t * 2.4);
+        ctx.strokeStyle = '#D8B4FE';
+        ctx.lineWidth = 5;
+        ctx.setLineDash([14, 10]);
+        ctx.beginPath();
+        ctx.arc(0, 0, o.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.rotate(-t * 4.2);
+        ctx.strokeStyle = '#FF6FCF';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, o.r - 12, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        ctx.font = '900 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🌀', o.x, o.y + 1);
+      } else if (o.type === 'boost' || o.type === 'mud') {
+        const isBoost = o.type === 'boost';
+        ctx.fillStyle = isBoost ? 'rgba(163,230,53,0.20)' : 'rgba(120,53,150,0.22)';
+        ctx.strokeStyle = isBoost ? 'rgba(130,176,0,0.55)' : 'rgba(88,28,135,0.45)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 9]);
+        ctx.beginPath();
+        ctx.roundRect(o.x - o.w / 2, o.y - o.h / 2, o.w, o.h, 20);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = '900 26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (isBoost) {
+          const drift = (performance.now() / 6) % 90;
+          ctx.fillStyle = 'rgba(130,176,0,0.8)';
+          for (let i = 0; i < 3; i++) {
+            ctx.fillText('⬇', o.x, o.y - o.h / 2 + 40 + ((drift + i * 90) % (o.h - 60)));
+          }
+        } else {
+          ctx.fillText('🍯', o.x, o.y - o.h / 2 + 40);
+          ctx.fillText('🍯', o.x, o.y + o.h / 2 - 40);
+        }
+      } else if (o.type === 'gate') {
+        const open = gateIsOpen(o);
+        ctx.lineCap = 'round';
+        let cursor = LEFT_WALL;
+        for (const gapX of o.gaps) {
+          ctx.strokeStyle = '#7C3AED';
+          ctx.lineWidth = o.t;
+          ctx.beginPath();
+          ctx.moveTo(cursor, o.y);
+          ctx.lineTo(gapX - o.gapW / 2, o.y);
+          ctx.stroke();
+          if (open) {
+            ctx.strokeStyle = 'rgba(163,230,53,0.7)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 8]);
+            ctx.beginPath();
+            ctx.moveTo(gapX - o.gapW / 2, o.y);
+            ctx.lineTo(gapX + o.gapW / 2, o.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          } else {
+            ctx.strokeStyle = '#F97316';
+            ctx.lineWidth = o.t;
+            ctx.beginPath();
+            ctx.moveTo(gapX - o.gapW / 2, o.y);
+            ctx.lineTo(gapX + o.gapW / 2, o.y);
+            ctx.stroke();
+          }
+          cursor = gapX + o.gapW / 2;
+        }
+        ctx.strokeStyle = '#7C3AED';
+        ctx.lineWidth = o.t;
+        ctx.beginPath();
+        ctx.moveTo(cursor, o.y);
+        ctx.lineTo(RIGHT_WALL, o.y);
+        ctx.stroke();
+        ctx.font = '900 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(open ? '🟢' : '🔒', o.gaps[0], o.y - 30);
+      } else if (o.type === 'tramp') {
+        ctx.fillStyle = '#38BDF8';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(o.x - o.w / 2, o.y - o.h / 2, o.w, o.h, 11);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 3;
+        for (let i = -2; i <= 2; i++) {
+          ctx.beginPath();
+          ctx.moveTo(o.x + i * 34, o.y + o.h / 2);
+          ctx.lineTo(o.x + i * 34, o.y + o.h / 2 + 12);
+          ctx.stroke();
+        }
+        ctx.font = '900 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🤸', o.x, o.y - 26);
       } else {
         ctx.fillStyle = o.type === 'bumper' ? '#FACC15' : '#FFFFFF';
         ctx.strokeStyle = o.type === 'bumper' ? '#F59E0B' : '#8B5CF6';
@@ -991,6 +1255,7 @@ export default function RaceGame() {
           lastY: 0,
           stallMs: 0,
           sideStuckMs: 0,
+          portalCoolMs: 0,
         }))
       : runnersRef.current;
 
@@ -1038,6 +1303,12 @@ export default function RaceGame() {
     ctx.fillRect(18, height - 20, width - 36, 8);
     ctx.fillStyle = '#A3E635';
     ctx.fillRect(18, height - 20, (width - 36) * progress, 8);
+
+    const flashLeft = flashRef.current - performance.now();
+    if (flashLeft > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${clamp(flashLeft / 280, 0, 1) * 0.75})`;
+      ctx.fillRect(0, 0, width, height);
+    }
   };
 
   const resetPreview = () => {
@@ -1085,9 +1356,75 @@ export default function RaceGame() {
       runner.vx = -Math.abs(runner.vx) * 0.72;
     }
 
+    runner.portalCoolMs = Math.max(0, runner.portalCoolMs - dt * 1000);
+    let inMud = false;
+
     courseMap.obstacles.forEach((o) => {
       if (obstacleMaxY(o) < runner.y - 280 || obstacleMinY(o) > runner.y + 420) return;
-      if (o.type === 'wall') {
+      if (o.type === 'portal') {
+        const d = Math.hypot(runner.x - o.x, runner.y - o.y);
+        if (runner.portalCoolMs <= 0 && d < o.r + runner.r * 0.3) {
+          spawnBurst(o.x, o.y, '#D8B4FE', 10);
+          runner.x = clamp(150 + Math.random() * (WORLD_W - 300), LEFT_WALL + runner.r + 20, RIGHT_WALL - runner.r - 20);
+          runner.y = Math.min(o.y + 280 + Math.random() * 360, courseMap.finishY - 700);
+          runner.vx = (Math.random() - 0.5) * 240;
+          runner.vy = 220;
+          runner.portalCoolMs = 1100;
+          spawnBurst(runner.x, runner.y, '#F0ABFC', 12);
+          announce(`✨ ${runner.name} 포털 워프!`);
+        }
+      } else if (o.type === 'boost') {
+        if (
+          Math.abs(runner.x - o.x) < o.w / 2 &&
+          Math.abs(runner.y - o.y) < o.h / 2
+        ) {
+          runner.vy += 950 * dt;
+          if (Math.random() < 0.08) spawnBurst(runner.x, runner.y, '#A3E635', 2);
+        }
+      } else if (o.type === 'mud') {
+        if (
+          Math.abs(runner.x - o.x) < o.w / 2 &&
+          Math.abs(runner.y - o.y) < o.h / 2
+        ) {
+          inMud = true;
+          if (runner.vy > 120) runner.vy += (120 - runner.vy) * 2.4 * dt;
+          runner.vx *= Math.max(0, 1 - 3 * dt);
+        }
+      } else if (o.type === 'gate') {
+        const open = gateIsOpen(o);
+        const segs: [number, number][] = [];
+        let cursor = LEFT_WALL;
+        for (const gapX of o.gaps) {
+          segs.push([cursor, gapX - o.gapW / 2]);
+          if (!open) segs.push([gapX - o.gapW / 2, gapX + o.gapW / 2]);
+          cursor = gapX + o.gapW / 2;
+        }
+        segs.push([cursor, RIGHT_WALL]);
+        for (const [x1, x2] of segs) {
+          collideSegment(runner, x1, o.y, x2, o.y, o.t);
+        }
+        if (!open && runner.y < o.y && runner.y > o.y - 150) {
+          runner.stallMs = 0;
+        }
+      } else if (o.type === 'tramp') {
+        const left = o.x - o.w / 2;
+        const right = o.x + o.w / 2;
+        const top = o.y - o.h / 2;
+        if (
+          runner.x > left - runner.r &&
+          runner.x < right + runner.r &&
+          runner.y + runner.r > top &&
+          runner.y < o.y &&
+          runner.vy > 0
+        ) {
+          runner.y = top - runner.r;
+          const launch = Math.max(runner.vy * 0.8 + 480, 620);
+          runner.vy = -Math.min(launch, 1350);
+          runner.vx += (Math.random() - 0.5) * 340;
+          spawnBurst(runner.x, o.y, '#FDE68A', 8);
+          if (launch > 900) announce(`🤸 ${runner.name} 대점프!`);
+        }
+      } else if (o.type === 'wall') {
         if (collideSegment(runner, o.x1, o.y1, o.x2, o.y2, o.t)) {
           const nearSide = runner.x < LEFT_WALL + runner.r + 45 || runner.x > RIGHT_WALL - runner.r - 45;
           if (nearSide && Math.abs(runner.vx) < 180) {
@@ -1154,7 +1491,7 @@ export default function RaceGame() {
     const progressed = runner.y - beforeY;
     const nearFinish = runner.y > courseMap.finishY - 900;
     const slowProgress = runner.y > 360 && progressed < 1.4 && Math.abs(runner.vy) < 220;
-    if ((nearFinish || slowProgress) && progressed < 1.8) {
+    if ((nearFinish || slowProgress) && progressed < 1.8 && !inMud) {
       runner.stallMs += dt * 1000;
     } else {
       runner.stallMs = Math.max(0, runner.stallMs - dt * 2200);
@@ -1181,7 +1518,13 @@ export default function RaceGame() {
       runner.finished = true;
       runner.finishTime = performance.now();
       finishRef.current.push(runnersRef.current.indexOf(runner));
-      if (finishRef.current.length === 1) winSfx(soundEnabled);
+      if (finishRef.current.length === 1) {
+        winSfx(soundEnabled);
+        flashRef.current = performance.now() + 280;
+        announce(`🏁 ${runner.name} 골인!`, true);
+      } else if (finishRef.current.length <= 3) {
+        announce(`🏁 ${runner.name} ${finishRef.current.length}등 골인!`);
+      }
     }
   };
 
@@ -1210,6 +1553,7 @@ export default function RaceGame() {
         lastY: 230 - row * 44,
         stallMs: 0,
         sideStuckMs: 0,
+        portalCoolMs: 0,
       };
     });
     finishRef.current = [];
@@ -1217,6 +1561,11 @@ export default function RaceGame() {
     camYRef.current = -260;
     gateOpenRef.current = false;
     lastTimeRef.current = 0;
+    lastLeaderRef.current = null;
+    tickerRef.current = { text: '', until: 0, lastAt: 0 };
+    slowmoRef.current = false;
+    zoomRef.current = 1;
+    raceStartRef.current = performance.now();
     setTimeout(() => {
       gateOpenRef.current = true;
     }, 900);
@@ -1228,10 +1577,30 @@ export default function RaceGame() {
 
       const selectedDone =
         settings.winMode === 'first' && finishRef.current.length >= winnerCount;
+
+      const unfinishedNow = runnersRef.current.filter((r) => !r.finished);
+      const frontRunner = [...unfinishedNow].sort((a, b) => b.y - a.y)[0];
+      let slowmo = false;
+      if (!fastForwardRef.current) {
+        if (settings.winMode === 'first') {
+          slowmo =
+            finishRef.current.length === 0 &&
+            !!frontRunner &&
+            frontRunner.y > courseMap.finishY - 320;
+        } else {
+          slowmo =
+            unfinishedNow.length === 1 &&
+            unfinishedNow[0].y > courseMap.finishY - 320;
+        }
+      }
+      slowmoRef.current = slowmo;
+      zoomRef.current += ((slowmo ? 1.2 : 1) - zoomRef.current) * 0.1;
+
       const speedScale = fastForwardRef.current ? 4 : selectedDone ? 2.8 : settings.speed === 'fast' ? 1.45 : 1;
-      const dt = rawDt * speedScale;
+      const dt = rawDt * (slowmo ? 0.3 : speedScale);
 
       courseMap.obstacles.forEach((o) => {
+        if (o.type === 'gate') o.clock += dt;
         if (o.type === 'spinner') o.angle += o.omega * dt;
         if (o.type === 'mover') {
           o.x += o.vx * dt;
@@ -1289,6 +1658,18 @@ export default function RaceGame() {
       const targetY = leader ? leader.y - 430 : courseMap.finishY - 760;
       camYRef.current += (clamp(targetY, -360, courseMap.finishY - 520) - camYRef.current) * 0.08;
 
+      if (
+        leader &&
+        finishRef.current.length === 0 &&
+        now - raceStartRef.current > 2500 &&
+        leader.id !== lastLeaderRef.current
+      ) {
+        if (lastLeaderRef.current !== null) {
+          announce(`🔥 ${leader.name} 선두로 치고 나갑니다!`);
+        }
+        lastLeaderRef.current = leader.id;
+      }
+
       drawScene();
       setFrame((f) => f + 1);
 
@@ -1329,6 +1710,7 @@ export default function RaceGame() {
         lastY: courseMap.finishY,
         stallMs: 0,
         sideStuckMs: 0,
+        portalCoolMs: 0,
       }));
       finishRef.current = runnersRef.current.map((_, i) => i);
       camYRef.current = courseMap.finishY - 760;
@@ -1426,6 +1808,23 @@ export default function RaceGame() {
 
         <div className="relative overflow-hidden rounded-2xl border-4 border-white bg-white shadow-[0_18px_45px_rgba(47,25,84,0.18)] sm:rounded-3xl">
           <canvas ref={canvasRef} className="game-canvas block w-full" />
+          {phase === 'racing' && tickerRef.current.until > performance.now() && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-3">
+              <span
+                key={tickerRef.current.lastAt}
+                className="pop-win rounded-full bg-pick-purple-950/85 px-5 py-2 text-sm font-black text-white sm:text-base"
+              >
+                {tickerRef.current.text}
+              </span>
+            </div>
+          )}
+          {phase === 'racing' && slowmoRef.current && (
+            <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center">
+              <span className="pixel-title pop-win text-2xl text-pick-pink-400 drop-shadow-[0_2px_0_rgba(47,25,84,0.7)] sm:text-3xl">
+                📸 포토피니시!
+              </span>
+            </div>
+          )}
           {phase === 'setup' && (
             <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-3 px-4">
               <button
