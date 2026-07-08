@@ -7,8 +7,17 @@ import { tickSfx, winSfx } from '../../lib/sfx';
 import type { Participant } from '../../lib/types';
 
 const CAPSULE_COLORS = ['#FF6FCF', '#FFD84A', '#73F7C5', '#BFFF22', '#7551F2'];
+const EMPTY_REELS = ['?', '?', '?'];
 
 type Phase = 'idle' | 'shaking' | 'dropping' | 'open';
+
+function nameReels(name: string) {
+  const letters = Array.from(name.trim()).filter((ch) => ch !== ' ');
+  if (letters.length === 0) return EMPTY_REELS;
+  if (letters.length === 1) return [letters[0], '당', '첨'];
+  if (letters.length === 2) return [letters[0], letters[1], '!'];
+  return [letters[0], letters.slice(1, -1).join(''), letters[letters.length - 1]];
+}
 
 export default function SlotGame() {
   const navigate = useNavigate();
@@ -26,7 +35,7 @@ export default function SlotGame() {
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [winners, setWinners] = useState<Participant[]>([]);
-  const [reels, setReels] = useState<string[]>(['?', '?', '?']);
+  const [reels, setReels] = useState<string[]>(EMPTY_REELS);
   const [lockedReels, setLockedReels] = useState(0);
   const lockedRef = useRef(0);
   const timersRef = useRef<number[]>([]);
@@ -57,7 +66,7 @@ export default function SlotGame() {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced) {
       setWinners((w) => [...w, winner]);
-      setReels([winner.name, winner.name, winner.name]);
+      setReels(nameReels(winner.name));
       setLockedReels(3);
       setPhase('open');
       return;
@@ -77,12 +86,13 @@ export default function SlotGame() {
     } else {
       setPhase('shaking');
       setLockedReels(0);
+      const winnerReels = nameReels(winner.name);
       const spin = window.setInterval(() => {
         setReels((r) =>
           r.map((v, i) =>
             i < lockedRef.current
               ? v
-              : remaining[Math.floor(Math.random() * remaining.length)].name,
+              : nameReels(remaining[Math.floor(Math.random() * remaining.length)].name)[i],
           ),
         );
         tickSfx(soundRef.current);
@@ -93,7 +103,7 @@ export default function SlotGame() {
         later(() => {
           lockedRef.current = i + 1;
           setLockedReels(i + 1);
-          setReels((r) => r.map((v, j) => (j <= i ? winner.name : v)));
+          setReels((r) => r.map((v, j) => (j <= i ? winnerReels[j] : v)));
           tickSfx(soundRef.current);
           if (i === 2) {
             window.clearInterval(spin);
@@ -109,7 +119,7 @@ export default function SlotGame() {
   const again = () => {
     lockedRef.current = 0;
     setLockedReels(0);
-    setReels(['?', '?', '?']);
+    setReels(EMPTY_REELS);
     setPhase('idle');
   };
 
@@ -182,13 +192,13 @@ export default function SlotGame() {
               {reels.map((name, i) => (
                 <div
                   key={i}
-                  className={`flex h-24 w-32 items-center justify-center rounded-2xl border-4 px-2 text-center ${
+                  className={`flex h-24 w-28 items-center justify-center rounded-2xl border-4 px-2 text-center sm:w-32 ${
                     i < lockedReels
                       ? 'border-pick-lime-400 bg-surface-lime'
                       : 'border-pick-purple-600/30 bg-surface-lavender'
                   } ${phase === 'shaking' && i >= lockedReels ? 'blur-[1px]' : ''}`}
                 >
-                  <span className="truncate text-xl font-black text-ink-purple">
+                  <span className="max-w-full truncate text-2xl font-black text-ink-purple">
                     {name}
                   </span>
                 </div>
@@ -245,7 +255,7 @@ export default function SlotGame() {
         </div>
 
         <p className="mb-4 rounded-xl bg-surface-lavender px-3 py-2 text-sm font-bold text-ink-purple">
-          캡슐이 데구르르! 오늘의 주인공을 뽑아요.
+          캡슐 또는 이름 슬롯으로 오늘의 주인공을 뽑아요.
         </p>
 
         <div className="mb-3">
@@ -267,7 +277,7 @@ export default function SlotGame() {
               disabled={phase !== 'idle'}
               onClick={() => updateSlot({ mode: 'slot' })}
             >
-              🎲 이름 맞추기
+              🎰 이름 슬롯
             </button>
           </div>
         </div>

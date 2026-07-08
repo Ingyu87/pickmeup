@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import LazyLottie from '../../components/lottie/LazyLottie';
 import { useAppStore } from '../../stores/session';
 import { activeParticipants, shuffle } from '../../lib/draw';
 import { winSfx } from '../../lib/sfx';
@@ -101,6 +102,7 @@ export default function LadderGame() {
 
   const [rungs, setRungs] = useState<Rungs>(() => genRungs(cols, rows));
   const [assigned, setAssigned] = useState<Record<number, number>>({});
+  const [boardVisible, setBoardVisible] = useState(false);
   const [marble, setMarble] = useState<{
     col: number;
     points: [number, number][];
@@ -114,6 +116,7 @@ export default function LadderGame() {
   useEffect(() => {
     setRungs(genRungs(cols, rows));
     setAssigned({});
+    setBoardVisible(false);
     setMarble(null);
   }, [cols, rows]);
 
@@ -166,6 +169,7 @@ export default function LadderGame() {
   const traceOne = async (startCol: number) => {
     if (animatingRef.current || assigned[startCol] !== undefined) return;
     animatingRef.current = true;
+    setBoardVisible(true);
     await runTrace(startCol, 1400);
     animatingRef.current = false;
   };
@@ -173,6 +177,7 @@ export default function LadderGame() {
   const revealAll = async () => {
     if (animatingRef.current) return;
     animatingRef.current = true;
+    setBoardVisible(true);
     revealAllRef.current = true;
     for (let c = 0; c < cols; c++) {
       if (!revealAllRef.current) break;
@@ -188,6 +193,7 @@ export default function LadderGame() {
     animatingRef.current = false;
     setRungs(genRungs(cols, rows));
     setAssigned({});
+    setBoardVisible(false);
     setMarble(null);
     showToast('사다리를 새로 만들었어요');
   };
@@ -230,147 +236,171 @@ export default function LadderGame() {
   return (
     <div className="game-shell lg:grid-cols-[1.6fr_minmax(260px,0.8fr)] lg:items-start">
       <section className="panel overflow-x-auto p-3 sm:p-4">
-        <svg width={width} height={height} className="mx-auto block">
-          {active.map((p, c) => {
-            const done = assigned[c] !== undefined;
-            return (
-              <g
-                key={p.id}
-                className="cursor-pointer"
-                onClick={() => void traceOne(c)}
-              >
-                <circle
-                  cx={xOf(c)}
-                  cy={TOP - 34}
-                  r={17}
-                  fill={done ? '#BFFF22' : '#7551F2'}
-                />
-                <text
-                  x={xOf(c)}
-                  y={TOP - 33}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="11"
-                  fontWeight="800"
-                  fill={done ? '#32126A' : '#FFFFFF'}
+        <div className="relative mx-auto w-fit">
+          <svg width={width} height={height} className="block">
+            {active.map((p, c) => {
+              const done = assigned[c] !== undefined;
+              return (
+                <g
+                  key={p.id}
+                  className="cursor-pointer"
+                  onClick={() => void traceOne(c)}
                 >
-                  {p.name.slice(0, 3)}
-                </text>
-              </g>
-            );
-          })}
+                  <circle
+                    cx={xOf(c)}
+                    cy={TOP - 34}
+                    r={17}
+                    fill={done ? '#BFFF22' : '#7551F2'}
+                  />
+                  <text
+                    x={xOf(c)}
+                    y={TOP - 33}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="11"
+                    fontWeight="800"
+                    fill={done ? '#32126A' : '#FFFFFF'}
+                  >
+                    {p.name.slice(0, 3)}
+                  </text>
+                </g>
+              );
+            })}
 
-          {active.map((_, c) => (
-            <line
-              key={`rail-${c}`}
-              x1={xOf(c)}
-              y1={TOP}
-              x2={xOf(c)}
-              y2={TOP + rows * ROW_H}
-              stroke="#7551F2"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-          ))}
+            {boardVisible && (
+              <>
+                {active.map((_, c) => (
+                  <line
+                    key={`rail-${c}`}
+                    x1={xOf(c)}
+                    y1={TOP}
+                    x2={xOf(c)}
+                    y2={TOP + rows * ROW_H}
+                    stroke="#7551F2"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                ))}
 
-          {rungs.map((row, r) =>
-            row.map((has, c) =>
-              has ? (
-                <line
-                  key={`rung-${r}-${c}`}
-                  x1={xOf(c)}
-                  y1={TOP + (r + 0.5) * ROW_H}
-                  x2={xOf(c + 1)}
-                  y2={TOP + (r + 0.5) * ROW_H}
-                  stroke="#B49CFF"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-              ) : null,
-            ),
+                {rungs.map((row, r) =>
+                  row.map((has, c) =>
+                    has ? (
+                      <line
+                        key={`rung-${r}-${c}`}
+                        x1={xOf(c)}
+                        y1={TOP + (r + 0.5) * ROW_H}
+                        x2={xOf(c + 1)}
+                        y2={TOP + (r + 0.5) * ROW_H}
+                        stroke="#B49CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                      />
+                    ) : null,
+                  ),
+                )}
+
+                {Object.entries(assigned).map(([c]) => {
+                  const { points } = tracePath(rungs, cols, Number(c), xOf);
+                  return (
+                    <polyline
+                      key={`done-${c}`}
+                      points={points.map((p) => p.join(',')).join(' ')}
+                      fill="none"
+                      stroke="#BFFF22"
+                      strokeWidth="5"
+                      strokeOpacity="0.55"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  );
+                })}
+
+                {marble && (
+                  <>
+                    <polyline
+                      points={(() => {
+                        const pts: [number, number][] = [];
+                        let acc = 0;
+                        for (let i = 0; i < marble.points.length; i++) {
+                          if (i > 0) {
+                            acc += Math.hypot(
+                              marble.points[i][0] - marble.points[i - 1][0],
+                              marble.points[i][1] - marble.points[i - 1][1],
+                            );
+                          }
+                          if (acc > marble.dist) break;
+                          pts.push(marble.points[i]);
+                        }
+                        pts.push(pointAt(marble.points, marble.dist));
+                        return pts.map((p) => p.join(',')).join(' ');
+                      })()}
+                      fill="none"
+                      stroke="#BFFF22"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx={pointAt(marble.points, marble.dist)[0]}
+                      cy={pointAt(marble.points, marble.dist)[1]}
+                      r="11"
+                      fill="#FF6FCF"
+                      stroke="#FFFFFF"
+                      strokeWidth="3"
+                    />
+                  </>
+                )}
+
+                {effLabels.map((label, c) => {
+                  const reached = Object.values(assigned).includes(c);
+                  return (
+                    <g key={`label-${c}`}>
+                      <rect
+                        x={xOf(c) - COL_W / 2 + 6}
+                        y={TOP + rows * ROW_H + 12}
+                        width={COL_W - 12}
+                        height={34}
+                        rx={10}
+                        fill={reached ? '#F4FFD0' : '#F3EDFF'}
+                        stroke={reached ? '#BFFF22' : 'transparent'}
+                        strokeWidth="3"
+                      />
+                      <text
+                        x={xOf(c)}
+                        y={TOP + rows * ROW_H + 30}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize="12"
+                        fontWeight="800"
+                        fill="#32126A"
+                      >
+                        {label.slice(0, 5)}
+                      </text>
+                    </g>
+                  );
+                })}
+              </>
+            )}
+          </svg>
+
+          {!boardVisible && (
+            <div
+              className="absolute inset-x-0 bottom-0 top-14 flex flex-col items-center justify-center rounded-2xl bg-white/95 px-6 text-center shadow-inner"
+              style={{ minWidth: width }}
+            >
+              <LazyLottie
+                src="/lottie/ladder/curtain-reveal/lottie.json"
+                loop
+                className="h-44 w-64"
+                fallback={<div className="text-6xl">🔒</div>}
+              />
+              <p className="text-lg font-black text-ink-purple">사다리는 아직 가려져 있어요</p>
+              <p className="mt-1 text-sm font-bold text-muted">
+                이름을 누르거나 전원 공개를 누르면 그때 결과를 확인합니다
+              </p>
+            </div>
           )}
-
-          {Object.entries(assigned).map(([c]) => {
-            const { points } = tracePath(rungs, cols, Number(c), xOf);
-            return (
-              <polyline
-                key={`done-${c}`}
-                points={points.map((p) => p.join(',')).join(' ')}
-                fill="none"
-                stroke="#BFFF22"
-                strokeWidth="5"
-                strokeOpacity="0.55"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            );
-          })}
-
-          {marble && (
-            <>
-              <polyline
-                points={(() => {
-                  const pts: [number, number][] = [];
-                  let acc = 0;
-                  for (let i = 0; i < marble.points.length; i++) {
-                    if (i > 0) {
-                      acc += Math.hypot(
-                        marble.points[i][0] - marble.points[i - 1][0],
-                        marble.points[i][1] - marble.points[i - 1][1],
-                      );
-                    }
-                    if (acc > marble.dist) break;
-                    pts.push(marble.points[i]);
-                  }
-                  pts.push(pointAt(marble.points, marble.dist));
-                  return pts.map((p) => p.join(',')).join(' ');
-                })()}
-                fill="none"
-                stroke="#BFFF22"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx={pointAt(marble.points, marble.dist)[0]}
-                cy={pointAt(marble.points, marble.dist)[1]}
-                r="11"
-                fill="#FF6FCF"
-                stroke="#FFFFFF"
-                strokeWidth="3"
-              />
-            </>
-          )}
-
-          {effLabels.map((label, c) => {
-            const reached = Object.values(assigned).includes(c);
-            return (
-              <g key={`label-${c}`}>
-                <rect
-                  x={xOf(c) - COL_W / 2 + 6}
-                  y={TOP + rows * ROW_H + 12}
-                  width={COL_W - 12}
-                  height={34}
-                  rx={10}
-                  fill={reached ? '#F4FFD0' : '#F3EDFF'}
-                  stroke={reached ? '#BFFF22' : 'transparent'}
-                  strokeWidth="3"
-                />
-                <text
-                  x={xOf(c)}
-                  y={TOP + rows * ROW_H + 30}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="12"
-                  fontWeight="800"
-                  fill="#32126A"
-                >
-                  {label.slice(0, 5)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        </div>
       </section>
 
       <section className="panel p-5">
