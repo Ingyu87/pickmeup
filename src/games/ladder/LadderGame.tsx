@@ -109,6 +109,9 @@ export default function LadderGame() {
     dist: number;
     total: number;
   } | null>(null);
+  const [racers, setRacers] = useState<
+    { col: number; points: [number, number][]; dist: number; total: number }[] | null
+  >(null);
   const rafRef = useRef(0);
   const animatingRef = useRef(false);
   const revealAllRef = useRef(false);
@@ -187,6 +190,65 @@ export default function LadderGame() {
     animatingRef.current = false;
   };
 
+  const raceAll = () => {
+    if (animatingRef.current) return;
+    const targets = Array.from({ length: cols }, (_, c) => c).filter(
+      (c) => assigned[c] === undefined,
+    );
+    if (targets.length === 0) return;
+    setBoardVisible(true);
+
+    const traces = targets.map((c) => {
+      const { points, endCol } = tracePath(rungs, cols, c, xOf);
+      return {
+        col: c,
+        points,
+        endCol,
+        total: pathLength(points),
+        dur: 1300 + Math.random() * 1400,
+      };
+    });
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      setAssigned((a) => {
+        const next = { ...a };
+        traces.forEach((t) => {
+          next[t.col] = t.endCol;
+        });
+        return next;
+      });
+      return;
+    }
+
+    animatingRef.current = true;
+    const arrived = new Set<number>();
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      let done = true;
+      const frame = traces.map((tr) => {
+        const t = Math.min(1, (now - startTime) / tr.dur);
+        const eased = 1 - Math.pow(1 - t, 2);
+        if (t < 1) done = false;
+        else if (!arrived.has(tr.col)) {
+          arrived.add(tr.col);
+          setAssigned((a) => ({ ...a, [tr.col]: tr.endCol }));
+          winSfx(soundEnabled);
+        }
+        return { col: tr.col, points: tr.points, dist: tr.total * eased, total: tr.total };
+      });
+      setRacers(frame);
+      if (!done) {
+        rafRef.current = requestAnimationFrame(step);
+      } else {
+        setRacers(null);
+        animatingRef.current = false;
+      }
+    };
+    rafRef.current = requestAnimationFrame(step);
+  };
+
   const regenerate = () => {
     revealAllRef.current = false;
     cancelAnimationFrame(rafRef.current);
@@ -195,6 +257,7 @@ export default function LadderGame() {
     setAssigned({});
     setBoardVisible(false);
     setMarble(null);
+    setRacers(null);
     showToast('사다리를 새로 만들었어요');
   };
 
@@ -351,6 +414,42 @@ export default function LadderGame() {
                   </>
                 )}
 
+                {racers?.map((r, idx) => {
+                  const color = ['#FF6FCF', '#BFFF22', '#FFD84A', '#73F7C5', '#7551F2', '#38BDF8'][
+                    idx % 6
+                  ];
+                  const head = pointAt(r.points, r.dist);
+                  return (
+                    <g key={`racer-${r.col}`}>
+                      <polyline
+                        points={(() => {
+                          const pts: [number, number][] = [];
+                          let acc = 0;
+                          for (let i = 0; i < r.points.length; i++) {
+                            if (i > 0) {
+                              acc += Math.hypot(
+                                r.points[i][0] - r.points[i - 1][0],
+                                r.points[i][1] - r.points[i - 1][1],
+                              );
+                            }
+                            if (acc > r.dist) break;
+                            pts.push(r.points[i]);
+                          }
+                          pts.push(head);
+                          return pts.map((p) => p.join(',')).join(' ');
+                        })()}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="5"
+                        strokeOpacity="0.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx={head[0]} cy={head[1]} r="10" fill={color} stroke="#FFFFFF" strokeWidth="3" />
+                    </g>
+                  );
+                })}
+
                 {effLabels.map((label, c) => {
                   const reached = Object.values(assigned).includes(c);
                   return (
@@ -444,8 +543,11 @@ export default function LadderGame() {
         </div>
 
         <div className="mb-4 flex flex-col gap-2">
-          <button type="button" className="btn-primary" onClick={() => void revealAll()}>
-            전원 공개
+          <button type="button" className="btn-primary" onClick={raceAll}>
+            🏁 동시 경주
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => void revealAll()}>
+            하나씩 전원 공개
           </button>
           <button type="button" className="btn-secondary" onClick={regenerate}>
             🔀 사다리 다시 만들기

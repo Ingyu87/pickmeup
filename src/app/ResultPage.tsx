@@ -13,6 +13,23 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+const CHEERS = [
+  '오늘 급식 줄 1등 예감! 🍀',
+  '행운이 함께해요 ✨',
+  '다 같이 박수 한 번! 👏',
+  '오늘의 주인공이에요 🌟',
+  '로봇도 축하해요 🤖💜',
+  '내일도 좋은 일 가득! 🌈',
+  '반짝반짝 행운의 별 ⭐',
+  '두구두구... 축하합니다! 🎉',
+];
+
+const PODIUM_STYLES = [
+  { h: 'h-24', bg: 'bg-gradient-to-b from-[#E5E7EB] to-[#9CA3AF]', medal: '🥈', delay: 450 },
+  { h: 'h-36', bg: 'bg-gradient-to-b from-[#FFF6A8] to-pick-yellow-400', medal: '👑', delay: 800 },
+  { h: 'h-16', bg: 'bg-gradient-to-b from-[#FBD38D] to-[#D97706]', medal: '🥉', delay: 150 },
+];
+
 export default function ResultPage() {
   const navigate = useNavigate();
   const lastResult = useAppStore((s) => s.lastResult);
@@ -236,6 +253,39 @@ export default function ResultPage() {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {!isQuota && !isAssign && winnerNames.length > 0 && (
+            <p className="mb-5 text-lg font-bold text-muted">
+              {CHEERS[lastResult.drawnAt % CHEERS.length]}
+            </p>
+          )}
+
+          {!isQuota && lastResult.rankings && lastResult.rankings.length >= 3 && (
+            <div className="mx-auto mb-6 flex max-w-md items-end justify-center gap-2">
+              {[lastResult.rankings[1], lastResult.rankings[0], lastResult.rankings[2]].map(
+                (r, i) => {
+                  const style = PODIUM_STYLES[i];
+                  return (
+                    <div
+                      key={r.rank}
+                      className="pop-win flex flex-1 flex-col items-center gap-1"
+                      style={{ animationDelay: `${style.delay}ms` }}
+                    >
+                      <span className="text-3xl">{style.medal}</span>
+                      <span className="max-w-full truncate text-lg font-black text-ink-purple">
+                        {r.name}
+                      </span>
+                      <div
+                        className={`flex w-full items-start justify-center rounded-t-2xl pt-1 ${style.h} ${style.bg}`}
+                      >
+                        <span className="pixel-title text-2xl text-ink-purple/60">{r.rank}</span>
+                      </div>
+                    </div>
+                  );
+                },
+              )}
             </div>
           )}
 

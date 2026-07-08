@@ -5,6 +5,8 @@ export default function Header() {
   const className = useAppStore((s) => s.className);
   const soundEnabled = useAppStore((s) => s.soundEnabled);
   const toggleSound = useAppStore((s) => s.toggleSound);
+  const bgmEnabled = useAppStore((s) => s.bgmEnabled);
+  const toggleBgm = useAppStore((s) => s.toggleBgm);
   const location = useLocation();
 
   const toggleFullscreen = () => {
@@ -45,6 +47,14 @@ export default function Header() {
           aria-pressed={soundEnabled}
         >
           {soundEnabled ? '🔊 켬' : '🔇 끔'}
+        </button>
+        <button
+          type="button"
+          onClick={toggleBgm}
+          className="rounded-xl border-2 border-white/30 bg-white/10 px-2.5 py-2 text-xs font-extrabold hover:bg-white/20 sm:px-3 sm:text-sm"
+          aria-pressed={bgmEnabled}
+        >
+          {bgmEnabled ? '🎵 BGM' : '🎵 끔'}
         </button>
         <button
           type="button"

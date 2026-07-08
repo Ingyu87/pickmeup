@@ -37,6 +37,7 @@ export default function SlotGame() {
   const [winners, setWinners] = useState<Participant[]>([]);
   const [reels, setReels] = useState<string[]>(EMPTY_REELS);
   const [lockedReels, setLockedReels] = useState(0);
+  const [golden, setGolden] = useState(false);
   const lockedRef = useRef(0);
   const timersRef = useRef<number[]>([]);
   const soundRef = useRef(soundEnabled);
@@ -73,6 +74,7 @@ export default function SlotGame() {
     }
 
     if (settings.mode === 'gacha') {
+      setGolden(Math.random() < 0.15);
       setPhase('shaking');
       tickSfx(soundRef.current);
       later(() => tickSfx(soundRef.current), 300);
@@ -120,6 +122,7 @@ export default function SlotGame() {
     lockedRef.current = 0;
     setLockedReels(0);
     setReels(EMPTY_REELS);
+    setGolden(false);
     setPhase('idle');
   };
 
@@ -143,7 +146,7 @@ export default function SlotGame() {
 
   return (
     <div className="game-shell max-w-6xl lg:grid-cols-[1.4fr_minmax(280px,0.9fr)] lg:items-start">
-      {phase === 'open' && <ConfettiBurst count={35} />}
+      {phase === 'open' && <ConfettiBurst count={golden ? 90 : 35} />}
 
       <section className="panel game-stage flex flex-col items-center justify-center gap-5 p-4 sm:gap-6 sm:p-6">
         {settings.mode === 'gacha' ? (
@@ -172,15 +175,30 @@ export default function SlotGame() {
 
             {phase === 'dropping' && (
               <div
-                className="pop-win size-20 rounded-full border-4 border-white shadow-lg"
+                className={`pop-win size-20 rounded-full border-4 shadow-lg ${
+                  golden
+                    ? 'border-pick-yellow-400 shadow-[0_0_28px_rgba(255,216,74,0.85)]'
+                    : 'border-white'
+                }`}
                 style={{
-                  background: `linear-gradient(180deg, #FFFFFF 48%, ${capsuleColor} 52%)`,
+                  background: golden
+                    ? 'linear-gradient(180deg, #FFF6A8 40%, #FFD84A 60%)'
+                    : `linear-gradient(180deg, #FFFFFF 48%, ${capsuleColor} 52%)`,
                 }}
               />
             )}
 
             {phase === 'open' && lastWinner && (
-              <div className="pop-win rounded-3xl border-4 border-pick-lime-400 bg-surface-lime px-10 py-5 text-center">
+              <div
+                className={`pop-win rounded-3xl border-4 px-10 py-5 text-center ${
+                  golden
+                    ? 'border-pick-yellow-400 bg-gradient-to-b from-[#FFF6A8] to-[#FFEDBD] shadow-[0_0_36px_rgba(255,216,74,0.6)]'
+                    : 'border-pick-lime-400 bg-surface-lime'
+                }`}
+              >
+                {golden && (
+                  <p className="mb-1 text-lg font-black text-[#B45309]">🌟 황금 캡슐! 🌟</p>
+                )}
                 <p className="pixel-title text-xl text-pick-purple-600">당첨!</p>
                 <p className="text-4xl font-black text-ink-purple">{lastWinner.name}</p>
               </div>

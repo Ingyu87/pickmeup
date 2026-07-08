@@ -11,13 +11,21 @@ import TermsPage from './app/TermsPage';
 import PrivacyPage from './app/PrivacyPage';
 import { useAppStore } from './stores/session';
 import { showToast } from './lib/toast';
+import { startBgm, stopBgm } from './lib/bgm';
 
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const setPath = useAppStore((s) => s.setPath);
   const saveStatus = useAppStore((s) => s.saveStatus);
+  const bgmEnabled = useAppStore((s) => s.bgmEnabled);
   const restoredOnce = useRef(false);
+
+  useEffect(() => {
+    if (bgmEnabled) startBgm();
+    else stopBgm();
+    return stopBgm;
+  }, [bgmEnabled]);
 
   useEffect(() => {
     if (restoredOnce.current) return;

@@ -38,6 +38,7 @@ interface AppStore {
   clearRoster: () => void;
   setPath: (p: string) => void;
   toggleSound: () => void;
+  toggleBgm: () => void;
   updateLot: (patch: Partial<GameSettings['lot']>) => void;
   updateWheel: (patch: Partial<GameSettings['wheel']>) => void;
   updateLadder: (patch: Partial<GameSettings['ladder']>) => void;
@@ -107,6 +108,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setPath: (p) => set({ path: p }),
 
   toggleSound: () => set({ soundEnabled: !get().soundEnabled }),
+
+  toggleBgm: () => set({ bgmEnabled: !get().bgmEnabled }),
 
   updateLot: (patch) =>
     set({

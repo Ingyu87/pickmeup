@@ -23,7 +23,12 @@ export interface DrawResult {
 }
 
 export interface GameSettings {
-  wheel: { winnerCount: number; sequential: boolean };
+  wheel: {
+    winnerCount: number;
+    sequential: boolean;
+    wheelMode?: 'names' | 'missions';
+    missions?: string[];
+  };
   lot: {
     mode: 'one' | 'many' | 'order' | 'quota';
     count: number;
@@ -54,7 +59,7 @@ export interface PersistedAppState {
 
 export function defaultGameSettings(): GameSettings {
   return {
-    wheel: { winnerCount: 1, sequential: false },
+    wheel: { winnerCount: 1, sequential: false, wheelMode: 'names', missions: [] },
     lot: { mode: 'one', count: 12, allowDuplicate: false, revealMode: 'sequential', theme: 'paper' },
     ladder: { labels: [], revealMode: 'one' },
     race: { winMode: 'first', winnerCount: 1, mapId: 'short', speed: 'normal' },
